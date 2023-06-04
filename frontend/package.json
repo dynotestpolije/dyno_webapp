@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "tailwind": "npx tailwindcss -i ./static/style.css -o ./static/tailwind.css",
+    "tailwind:watch": "npx tailwindcss -i ./static/style.css -o ./static/tailwind.css --watch",
+    "dev": "concurrently \"webpack-dev-server --mode development --open\" \"npm run tailwind:watch\"",
+    "build": "npm run tailwind --mode production",
+    "build:dev": "npm run tailwind --mode development"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5",
+    "@tailwindcss/typography": "^0.5",
+    "concurrently": "^8.1",
+    "daisyui": "^3",
+    "tailwindcss": "^3.3"
+  }
+}

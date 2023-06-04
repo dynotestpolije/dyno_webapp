@@ -1,0 +1,22 @@
+[package]
+name = "frontend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yew = { version = "0.20", features = ["csr"] }
+yew-router = "0.17"
+gloo = "0.8"
+wasm-logger = "0.2.0"
+yew_icons = { version = "0.7.2", features = ["heroicons_outline", "heroicons_solid"] }
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "HtmlInputElement",
+]
+
+[dependencies.dyno_core]
+workspace = true
+default-features = false
+features = ["use_wasm"]
