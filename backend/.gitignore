@@ -1,0 +1,11 @@
+.env
+tls
+.dev
+config.toml$
+**dynotest_database**
+**.db
+target
+Cargo.lock
+
+log
+

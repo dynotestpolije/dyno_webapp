@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [ "backend", "frontend" ] 
+
+[workspace.dependencies]
+futures = { version = "0.3.28" }
+serde = { version = "1.0", features = ["derive"] }
+
+[workspace.dependencies.dyno_core]
+# git = "https://github.com/dynotestpolije/dyno_core.git"
+# branch = "dev" 
+path = "../dyno_core"
+
+[workspace.dependencies.dotenv]
+version = "0.15"
+
+[workspace.dependencies.env_logger]
+version = "0.10.0"
