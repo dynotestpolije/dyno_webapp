@@ -2,12 +2,12 @@
 
 diesel::table! {
     dyno_info (id) {
-        id -> Integer,
-        motor_type -> Integer,
+        id -> BigInt,
+        motor_type -> SmallInt,
         name -> Nullable<Text>,
-        cc -> Nullable<Integer>,
-        cylinder -> Nullable<Integer>,
-        stroke -> Nullable<Integer>,
+        cc -> Nullable<SmallInt>,
+        cylinder -> Nullable<SmallInt>,
+        stroke -> Nullable<SmallInt>,
         diameter_roller -> Nullable<Float>,
         diameter_roller_beban -> Nullable<Float>,
         diameter_gear_encoder -> Nullable<Float>,
@@ -23,10 +23,11 @@ diesel::table! {
 
 diesel::table! {
     dynos (id) {
-        id -> Integer,
-        user_id -> Integer,
-        info_id -> Nullable<Integer>,
+        id -> BigInt,
+        user_id -> BigInt,
+        info_id -> Nullable<BigInt>,
         uuid -> Text,
+        data_url -> Nullable<Text>,
         data_checksum -> Text,
         verified -> Nullable<Bool>,
         start -> Timestamp,
@@ -38,7 +39,7 @@ diesel::table! {
 
 diesel::table! {
     users (id) {
-        id -> Integer,
+        id -> BigInt,
         uuid -> Text,
         nim -> Text,
         name -> Text,

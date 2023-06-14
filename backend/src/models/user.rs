@@ -17,7 +17,7 @@ use super::{role::ROLES, uuid::UUID};
 #[serde(crate = "serde")]
 #[diesel(table_name = users)]
 pub struct User {
-    pub id: i32,
+    pub id: i64,
     pub uuid: UUID,
     pub nim: String,
     pub name: String,
@@ -33,7 +33,7 @@ impl User {
     pub fn into_user_response(self) -> DynoResult<UserResponse> {
         Ok(UserResponse {
             id: self.id as _,
-            uuid: self.uuid.try_into()?,
+            uuid: self.uuid.into_inner(),
             nim: self.nim,
             name: self.name,
             email: self.email,
@@ -53,6 +53,7 @@ impl User {
 pub struct NewUser {
     pub uuid: UUID,
     pub nim: String,
+    pub name: String,
     pub password: String,
     pub role: ROLES,
     pub email: Option<String>,
@@ -71,6 +72,7 @@ impl NewUser {
     ) -> DynoResult<Self> {
         dyno_core::crypto::hash_password(password).map(|hashed_pswd| Self {
             uuid: UUID::new(),
+            name: nim.clone(),
             nim,
             password: hashed_pswd,
             role: ROLES(role),

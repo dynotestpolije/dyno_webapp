@@ -3,26 +3,11 @@ use std::path::PathBuf;
 use std::process::exit;
 
 #[inline]
-pub fn get_env_default<S: AsRef<str>>(env: S, def: String) -> String {
-    let env = env.as_ref();
-    match std::env::var(env) {
-        Ok(path) => {
-            log::info!("ENV Variable - [{env}:`{path}`]");
-            path
-        }
-        Err(err) => {
-            log::error!("Failed to get config paths for ENV:`{env}` - {err} [defaulting to {def}]",);
-            def
-        }
-    }
-}
-
-#[inline]
 pub fn get_env<S: AsRef<str>>(env: S) -> String {
     let env = env.as_ref();
     match std::env::var(env) {
         Ok(path) => {
-            log::info!("ENV Variable - [{env}:`{path}`]");
+            log::debug!("ENV Variable - [{env}:`{path}`]");
             path
         }
         Err(err) => {
@@ -32,19 +17,19 @@ pub fn get_env<S: AsRef<str>>(env: S) -> String {
     }
 }
 
+#[inline]
 pub fn get_env_optional<S: AsRef<str>>(env: S) -> Option<String> {
     let env = env.as_ref();
     match std::env::var(env) {
         Ok(path) => {
-            log::info!("ENV Variable - [{env}:`{path}`]");
+            log::debug!("ENV Variable - [{env}:`{path}`]");
             Some(path)
         }
         Err(_) => None,
     }
 }
 
-#[cfg_attr(debug_assert, derive(Debug))]
-#[derive(Default, Clone, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
+#[derive(Debug, Default, Clone, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
 #[serde(crate = "dyno_core::serde")]
 pub struct ServerConfig {
     pub secret: Option<Secrets>,
@@ -88,8 +73,7 @@ impl ServerConfig {
     }
 }
 
-#[cfg_attr(debug_assert, derive(Debug))]
-#[derive(Default, Clone, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
+#[derive(Debug, Default, Clone, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
 #[serde(crate = "dyno_core::serde")]
 pub struct Secrets {
     pub cert: String,
@@ -104,23 +88,40 @@ impl Secrets {
     }
 }
 
-#[cfg_attr(debug_assert, derive(Debug))]
-#[derive(Default, Clone, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
+#[derive(Debug, Default, Clone, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
 #[serde(crate = "dyno_core::serde")]
 pub struct Jwt {
-    pub secret: String,
-    pub expires_in: String,
-    pub maxage: i32,
+    pub access_token_private_key: String,
+    pub access_token_public_key: String,
+    pub access_token_expires_in: String,
+    pub access_token_max_age: i64,
+
+    pub refresh_token_private_key: String,
+    pub refresh_token_public_key: String,
+    pub refresh_token_expires_in: String,
+    pub refresh_token_max_age: i64,
 }
 
 impl Jwt {
     fn init() -> Self {
+        let access_token_private_key = get_env("ACCESS_TOKEN_PRIVATE_KEY");
+        let access_token_public_key = get_env("ACCESS_TOKEN_PUBLIC_KEY");
+        let access_token_expires_in = get_env("ACCESS_TOKEN_EXPIRED_IN");
+        let access_token_max_age = get_env("ACCESS_TOKEN_MAXAGE").parse().unwrap_or(120);
+
+        let refresh_token_private_key = get_env("REFRESH_TOKEN_PRIVATE_KEY");
+        let refresh_token_public_key = get_env("REFRESH_TOKEN_PUBLIC_KEY");
+        let refresh_token_expires_in = get_env("REFRESH_TOKEN_EXPIRED_IN");
+        let refresh_token_max_age = get_env("REFRESH_TOKEN_MAXAGE").parse().unwrap_or(240);
         Self {
-            secret: get_env("JWT_SECRET"),
-            expires_in: get_env_default("JWT_EXPIRED_IN", "120m".to_owned()),
-            maxage: get_env_default("JWT_MAXAGE", "120".to_owned())
-                .parse()
-                .unwrap(),
+            access_token_private_key,
+            access_token_public_key,
+            access_token_expires_in,
+            access_token_max_age,
+            refresh_token_private_key,
+            refresh_token_public_key,
+            refresh_token_expires_in,
+            refresh_token_max_age,
         }
     }
 }

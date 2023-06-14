@@ -2,7 +2,7 @@ use crate::{
     actions::user as user_actions,
     handler::UserUrlsQueries,
     middlewares::JwtAdminMiddleware,
-    models::user::{NewUser, UpdateUser},
+    models::user::{NewUser, UpdateUser, User},
 };
 use actix_web::{delete, get, patch, post, web, HttpResponse, Responder};
 use dyno_core::{
@@ -15,15 +15,20 @@ use dyno_core::{
 pub async fn get_user(
     web::Query(UserUrlsQueries { id, max }): web::Query<UserUrlsQueries>,
     _: JwtAdminMiddleware,
-    dbpool: web::Data<crate::DynoDBPool>,
+    data: web::Data<crate::ServerState>,
 ) -> impl Responder {
+    let dbpool = data.db.clone();
+
     let user_response = web::block(move || {
         dbpool
             .get()
             .map_err(DynoErr::database_error)
             .and_then(|mut conn| match id {
-                Some(id) => user_actions::find_by_id(&mut conn, id).map(OneOrMany::One),
-                None => user_actions::select_many(&mut conn, max).map(OneOrMany::Many),
+                Some(id) => user_actions::find_by_id(&mut conn, id)
+                    .map(|u| OneOrMany::One(u.into_user_response())),
+                None => user_actions::select_many(&mut conn, max).map(|v| {
+                    OneOrMany::Many(v.into_iter().map(User::into_user_response).collect())
+                }),
             })
     })
     .await
@@ -39,8 +44,9 @@ pub async fn get_user(
 pub async fn add_user(
     web::Json(jsons): web::Json<OneOrMany<UserRegistration>>,
     _: JwtAdminMiddleware,
-    dbpool: web::Data<crate::DynoDBPool>,
+    data: web::Data<crate::ServerState>,
 ) -> impl Responder {
+    let dbpool = data.db.clone();
     let blk_result = web::block(move || {
         dbpool
             .get()
@@ -70,8 +76,9 @@ pub async fn update_user(
     user_id: web::Path<u32>,
     web::Json(user_update): web::Json<UserUpdate>,
     _: JwtAdminMiddleware,
-    dbpool: web::Data<crate::DynoDBPool>,
+    data: web::Data<crate::ServerState>,
 ) -> impl Responder {
+    let dbpool = data.db.clone();
     let id = user_id.into_inner();
     let user_response = web::block(move || {
         dbpool
@@ -94,8 +101,9 @@ pub async fn update_user(
 pub async fn delete_user(
     user_id: web::Path<u32>,
     _: JwtAdminMiddleware,
-    dbpool: web::Data<crate::DynoDBPool>,
+    data: web::Data<crate::ServerState>,
 ) -> impl Responder {
+    let dbpool = data.db.clone();
     let id = user_id.into_inner();
     let user_response = web::block(move || {
         dbpool

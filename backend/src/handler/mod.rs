@@ -6,7 +6,7 @@ pub mod user;
 #[derive(Clone, Default, dyno_core::serde::Deserialize)]
 #[serde(crate = "dyno_core::serde")]
 pub struct UserUrlsQueries {
-    pub id: Option<i32>,
+    pub id: Option<i64>,
     pub max: Option<u32>,
 }
 
@@ -14,8 +14,8 @@ pub struct UserUrlsQueries {
 #[derive(Clone, Default, dyno_core::serde::Deserialize)]
 #[serde(crate = "dyno_core::serde")]
 pub struct DynoUrlsQueries {
-    pub id: Option<i32>,
-    pub user_id: Option<i32>,
+    pub id: Option<i64>,
+    pub user_id: Option<i64>,
     pub max: Option<u32>,
 }
 
@@ -41,5 +41,4 @@ pub fn api() -> actix_web::Scope {
         .service(user::delete_user)
         .service(dyno::get_dyno)
         .service(dyno::add_dyno)
-        .service(dyno::get_dyno_file_path)
 }

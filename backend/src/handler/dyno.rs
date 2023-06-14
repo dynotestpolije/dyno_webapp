@@ -10,8 +10,11 @@ use futures::TryStreamExt;
 // use futures::TryStreamExt;
 
 use crate::{
-    actions::dyno as dyno_actions, actions::info as info_actions, handler::DynoUrlsQueries,
-    middlewares::JwtUserMiddleware, models::dyno::NewDynos,
+    actions::dyno as dyno_actions,
+    actions::info as info_actions,
+    handler::DynoUrlsQueries,
+    middlewares::JwtUserMiddleware,
+    models::dyno::{Dynos, NewDynos},
 };
 
 /// # Dynotest Endpoint `add_dyno`
@@ -26,9 +29,10 @@ use crate::{
 pub async fn add_dyno(
     mut payload: Multipart,
     JwtUserMiddleware(session): JwtUserMiddleware,
-    dbpool: web::Data<crate::DynoDBPool>,
-    cfg: web::Data<crate::config::ServerConfig>,
+    data: web::Data<crate::ServerState>,
 ) -> DynoResult<HttpResponse> {
+    let dbpool = data.db.clone();
+    let cfg = &data.cfg;
     let mut info_stream = web::BytesMut::with_capacity(core::mem::size_of::<DynoTestDataInfo>());
     let mut data_stream = web::BytesMut::new();
 
@@ -64,23 +68,25 @@ pub async fn add_dyno(
     let root_path = cfg.app_root_path.clone();
     let blk_result = web::block(move || {
         let mut conn = dbpool.get().map_err(DynoErr::database_error)?;
-        let dyno_config: DynoTestDataInfo =
-            DynoTestDataInfo::decompress(&info_stream).map_err(|err| {
-                DynoErr::bad_request_error(format!(
-                    "Multipart POST data is invalid, there no json config - {err}",
-                ))
-            })?;
+        let dyno_config = DynoTestDataInfo::decompress(&info_stream).map_err(|err| {
+            DynoErr::bad_request_error(format!(
+                "Multipart POST data is invalid, there no json config - {err}",
+            ))
+        })?;
 
         let checksum = checksum_from_bytes(&data_stream);
         if compare_checksums(checksum.as_bytes(), dyno_config.checksum_hex.as_bytes()) {
             let config = dyno_config.config.clone();
             let info_id = info_actions::insert(&mut conn, config.into()).ok();
 
-            let new_dyno = NewDynos::new(info_id, id, dyno_config);
+            let new_dyno = NewDynos::new(id, info_id, dyno_config);
             let dyno_id = dyno_actions::insert(&mut conn, new_dyno)?;
 
-            let file_path = root_path.join(format!("/data/dyno/{dyno_id}-{id}-{uuid}",));
-            std::fs::write(file_path, data_stream).map_err(DynoErr::internal_server_error)
+            std::fs::write(
+                root_path.join(format!("/data/dyno/{dyno_id}-{id}-{uuid}")),
+                data_stream,
+            )
+            .map_err(DynoErr::internal_server_error)
         } else {
             Err(DynoErr::expectation_failed_error(
                 "Failed receive data, checksum of data stream is not the same",
@@ -105,17 +111,21 @@ pub async fn add_dyno(
 pub async fn get_dyno(
     web::Query(DynoUrlsQueries { id, user_id, max }): web::Query<DynoUrlsQueries>,
     JwtUserMiddleware(session): JwtUserMiddleware,
-    dbpool: web::Data<crate::DynoDBPool>,
+    data: web::Data<crate::ServerState>,
 ) -> DynoResult<HttpResponse> {
-    let user_id = user_id.unwrap_or(session.id);
+    let dbpool = data.db.clone();
 
+    let user_id = user_id.unwrap_or(session.id);
     let blk_result = web::block(move || {
         dbpool
             .get()
             .map_err(DynoErr::database_error)
             .and_then(|mut conn| match id {
-                Some(id) => dyno_actions::select(&mut conn, id, user_id).map(OneOrMany::One),
-                None => dyno_actions::select_many(&mut conn, user_id, max).map(OneOrMany::Many),
+                Some(id) => dyno_actions::select(&mut conn, id, user_id)
+                    .map(|x| OneOrMany::One(Dynos::into_response(x))),
+                None => dyno_actions::select_many(&mut conn, user_id, max).map(|x| {
+                    OneOrMany::Many(x.into_iter().map(Dynos::into_response).collect::<Vec<_>>())
+                }),
             })
     })
     .await
@@ -124,30 +134,5 @@ pub async fn get_dyno(
     blk_result.map(|x| match x {
         OneOrMany::One(one) => HttpResponse::Ok().json(ApiResponse::success(one)),
         OneOrMany::Many(many) => HttpResponse::Ok().json(ApiResponse::success(many)),
-    })
-}
-
-#[get("/dyno/file/{id}")]
-pub async fn get_dyno_file_path(
-    id: web::Path<i32>,
-    JwtUserMiddleware(session): JwtUserMiddleware,
-    dbpool: web::Data<crate::DynoDBPool>,
-) -> DynoResult<HttpResponse> {
-    let user_id = session.id;
-    let blk_result = web::block(move || {
-        dbpool
-            .get()
-            .map_err(DynoErr::database_error)
-            .and_then(|mut conn| dyno_actions::select_id(&mut conn, id.into_inner(), user_id))
-    })
-    .await
-    .map_err(DynoErr::internal_server_error)?;
-
-    blk_result.map(|dyno_id| {
-        let id = session.id;
-        let uuid = session.uuid;
-        HttpResponse::Ok().json(ApiResponse::success(format!(
-            "/data/dyno/{dyno_id}-{id}-{uuid}"
-        )))
     })
 }

@@ -1,11 +1,13 @@
 use diesel::{deserialize, serialize, serialize::Output, sql_types::Text};
+use dyno_core::serde;
+use dyno_core::uuid::fmt::Simple;
 use dyno_core::uuid::Uuid;
-use dyno_core::{serde, DynoErr, DynoResult};
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(
     Debug,
     Clone,
+    Copy,
     diesel::FromSqlRow,
     diesel::AsExpression,
     serde::Serialize,
@@ -16,33 +18,30 @@ use dyno_core::{serde, DynoErr, DynoResult};
 )]
 #[serde(crate = "serde")]
 #[diesel(sql_type = Text)]
-pub struct UUID(pub String);
+pub struct UUID(pub Uuid);
 
 impl UUID {
     pub fn new() -> Self {
-        Self(Uuid::new_v4().to_string())
+        Self(Uuid::new_v4())
     }
 
     /// Returns a reference to the inner of this [`UUID`].
     #[inline]
-    pub fn inner(&self) -> &str {
+    pub fn inner(&self) -> &Uuid {
         &self.0
     }
 
     /// return a owned to the innner of this [`UUID`]
     #[inline]
-    pub fn into_inner(self) -> String {
+    pub const fn into_inner(self) -> Uuid {
         self.0
     }
 
-    /// Returns the uuid of this [`UUID`].
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if [`uuid::Uuid::parse_str`] failed ot parse from str.
-    #[inline]
-    pub fn uuid(&self) -> DynoResult<Uuid> {
-        Uuid::parse_str(&self.0).map_err(DynoErr::parsing_error)
+    fn as_str(&self) -> &str {
+        unsafe {
+            static mut BUFFER: [u8; Simple::LENGTH] = [0x0; Simple::LENGTH];
+            self.0.simple().encode_lower(&mut BUFFER)
+        }
     }
 }
 
@@ -53,16 +52,15 @@ impl Default for UUID {
     }
 }
 
-impl TryFrom<UUID> for Uuid {
-    type Error = DynoErr;
-    fn try_from(value: UUID) -> Result<Self, Self::Error> {
-        value.uuid()
+impl From<Uuid> for UUID {
+    fn from(value: Uuid) -> Self {
+        Self(value)
     }
 }
 
 impl std::fmt::Display for UUID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.as_simple())
     }
 }
 
@@ -72,7 +70,9 @@ where
     String: diesel::deserialize::FromSql<Text, B>,
 {
     fn from_sql(bytes: B::RawValue<'_>) -> deserialize::Result<Self> {
-        String::from_sql(bytes).map(UUID).map_err(Into::into)
+        String::from_sql(bytes)
+            .map(|s| Self(Uuid::try_parse_ascii(s.as_bytes()).expect("this is should not error")))
+            .map_err(Into::into)
     }
 }
 
@@ -82,7 +82,7 @@ where
     str: diesel::serialize::ToSql<Text, B>,
 {
     fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, B>) -> serialize::Result {
-        str::to_sql(&self.0, out)
+        str::to_sql(self.as_str(), out)
             .map(|_| diesel::serialize::IsNull::No)
             .map_err(Into::into)
     }

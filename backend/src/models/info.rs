@@ -1,5 +1,6 @@
 use crate::schema::dyno_info;
 use dyno_core::chrono::NaiveDateTime;
+use dyno_core::model::dynotests::MotorTy;
 use dyno_core::{serde, DynoConfig, ElectricMotor, InfoMotor, Numeric};
 
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -14,12 +15,12 @@ use dyno_core::{serde, DynoConfig, ElectricMotor, InfoMotor, Numeric};
 #[serde(crate = "serde")]
 #[diesel(table_name = dyno_info)]
 pub struct DynoInfo {
-    pub id: i32,
-    pub motor_type: i32,
+    pub id: i64,
+    pub motor_type: i16,
     pub name: Option<String>,
-    pub cc: Option<i32>,
-    pub cylinder: Option<i32>,
-    pub stroke: Option<i32>,
+    pub cc: Option<i16>,
+    pub cylinder: Option<i16>,
+    pub stroke: Option<i16>,
     pub diameter_roller: Option<f32>,
     pub diameter_roller_beban: Option<f32>,
     pub diameter_gear_encoder: Option<f32>,
@@ -37,11 +38,11 @@ pub struct DynoInfo {
 #[serde(crate = "serde")]
 #[diesel(table_name = dyno_info)]
 pub struct NewDynoInfo {
-    pub motor_type: i32,
+    pub motor_type: i16,
     pub name: Option<String>,
-    pub cc: Option<i32>,
-    pub cylinder: Option<i32>,
-    pub stroke: Option<i32>,
+    pub cc: Option<i16>,
+    pub cylinder: Option<i16>,
+    pub stroke: Option<i16>,
     pub diameter_roller: Option<f32>,
     pub diameter_roller_beban: Option<f32>,
     pub diameter_gear_encoder: Option<f32>,
@@ -68,7 +69,7 @@ impl NewDynoInfo {
     ) -> Self {
         match motor_type {
             dyno_core::MotorType::Electric(ElectricMotor { name }) => Self {
-                motor_type: dyno_core::model::dynotests::MotorTy::Electric as i32,
+                motor_type: MotorTy::Electric as i16,
                 name: Some(name),
                 diameter_roller: Some(diameter_roller.to_f32()),
                 diameter_roller_beban: Some(diameter_roller_beban.to_f32()),
@@ -87,7 +88,7 @@ impl NewDynoInfo {
                 stroke,
                 ..
             }) => Self {
-                motor_type: dyno_core::model::dynotests::MotorTy::Electric as i32,
+                motor_type: MotorTy::Electric as _,
                 name: Some(name),
                 diameter_roller: Some(diameter_roller.to_f32()),
                 diameter_roller_beban: Some(diameter_roller_beban.to_f32()),
@@ -97,9 +98,9 @@ impl NewDynoInfo {
                 berat_beban: Some(berat_beban.to_f32()),
                 gaya_beban: Some(gaya_beban.to_f32()),
                 keliling_roller: Some(keliling_roller.to_f32()),
-                cc: Some(cc as i32),
-                cylinder: Some(cylinder as i32),
-                stroke: Some(stroke as i32),
+                cc: Some(cc as _),
+                cylinder: Some(cylinder as _),
+                stroke: Some(stroke as _),
             },
         }
     }

@@ -10,14 +10,14 @@ use dyno_core::{DynoErr, DynoResult};
 #[allow(unused)]
 pub fn is_exists(
     conn: &mut DynoDBPooledConnection,
-    id: i32,
+    id: i64,
     name: impl AsRef<str>,
 ) -> DynoResult<bool> {
     let name = name.as_ref();
     dsl::dyno_info
         .select(dsl::id)
         .filter(dsl::id.eq(id).and(dsl::name.eq(name)))
-        .first::<i32>(conn)
+        .first::<i64>(conn)
         .optional()
         .map_err(DynoErr::database_error)
         .map(|x| x.is_some())
@@ -25,7 +25,7 @@ pub fn is_exists(
 
 #[inline]
 #[allow(unused)]
-pub fn select(conn: &mut DynoDBPooledConnection, id: i32) -> DynoResult<DynoInfo> {
+pub fn select(conn: &mut DynoDBPooledConnection, id: i64) -> DynoResult<DynoInfo> {
     dsl::dyno_info
         .filter(dsl::id.eq(id))
         .select(DynoInfo::as_select())
@@ -37,17 +37,17 @@ pub fn select(conn: &mut DynoDBPooledConnection, id: i32) -> DynoResult<DynoInfo
 
 #[inline]
 #[allow(unused)]
-pub fn insert(conn: &mut DynoDBPooledConnection, new: NewDynoInfo) -> DynoResult<i32> {
+pub fn insert(conn: &mut DynoDBPooledConnection, new: NewDynoInfo) -> DynoResult<i64> {
     diesel::insert_into(dsl::dyno_info)
         .values(new)
         .returning(dsl::id)
-        .get_result::<i32>(conn)
+        .get_result::<i64>(conn)
         .map_err(DynoErr::database_error)
 }
 
 #[inline]
 #[allow(unused)]
-pub fn select_many(conn: &mut DynoDBPooledConnection, id: i32) -> DynoResult<Vec<DynoInfo>> {
+pub fn select_many(conn: &mut DynoDBPooledConnection, id: i64) -> DynoResult<Vec<DynoInfo>> {
     dsl::dyno_info
         .select(DynoInfo::as_select())
         .filter(dsl::id.eq(id))

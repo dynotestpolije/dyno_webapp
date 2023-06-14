@@ -22,13 +22,15 @@ macro_rules! query_one {
         use crate::schema::$table::dsl::*;
         diesel::update($table.filter($filter))
             .set($val)
-            .execute($conn)
+            .returning(id)
+            .get_result::<i64>($conn)
             .map_err(DynoErr::database_error)
     }};
     (DELETE $table:ident WHERE ($filter:expr) [$conn:expr]) => {{
         use crate::schema::$table::dsl::*;
         diesel::delete($table.filter($filter))
-            .execute($conn)
+            .returning(id)
+            .get_result::<i64>($conn)
             .map_err(DynoErr::database_error)
     }};
 }

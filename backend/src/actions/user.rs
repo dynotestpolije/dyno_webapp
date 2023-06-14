@@ -24,7 +24,7 @@ macro_rules! impl_generic_funcs {
             #[doc = " # Return [DynoResult]"]
             #[doc = "Err([DynoErr::database_error])"]
             #[doc = "Ok([usize]) `number of rows that efected, not the id.`"]
-            pub fn [<delete_by_ $by:lower>](conn: &mut DynoDBPooledConnection, [<user_ $by:lower>]: $types) -> DynoResult<usize> {
+            pub fn [<delete_by_ $by:lower>](conn: &mut DynoDBPooledConnection, [<user_ $by:lower>]: $types) -> DynoResult<i64> {
                 super::query_one!(DELETE users WHERE ($by.eq([<user_ $by:lower>])) [conn])
             }
             #[allow(unused)]
@@ -34,21 +34,21 @@ macro_rules! impl_generic_funcs {
             #[doc = " # Return [DynoResult]"]
             #[doc = "Err([DynoErr::database_error])"]
             #[doc = "Ok([usize]) `number of rows that efected, not the id.`"]
-            pub fn [<update_by_ $by:lower>](conn: &mut DynoDBPooledConnection, [<user_ $by:lower>]: $types, updated: UpdateUser) -> DynoResult<usize> {
+            pub fn [<update_by_ $by:lower>](conn: &mut DynoDBPooledConnection, [<user_ $by:lower>]: $types, updated: UpdateUser) -> DynoResult<i64> {
                 super::query_one!(UPDATE users WHERE ($by.eq([<user_ $by:lower>])) VALUES updated [conn])
             }
         )*}
     };
 }
-impl_generic_funcs!(uuid: &str, id: i32, nim: &str);
+impl_generic_funcs!(uuid: &str, id: i64, nim: &str);
 
 #[allow(unused)]
 #[inline]
-pub fn is_exists_by_id(conn: &mut DynoDBPooledConnection, id: i32) -> DynoResult<bool> {
+pub fn is_exists_by_id(conn: &mut DynoDBPooledConnection, id: i64) -> DynoResult<bool> {
     dsl::users
         .find(id)
         .select(dsl::id)
-        .first::<i32>(conn)
+        .first::<i64>(conn)
         .optional()
         .map_err(DynoErr::database_error)
         .map(|x| x.is_some())
@@ -59,7 +59,7 @@ pub fn is_exists_by_nim(conn: &mut DynoDBPooledConnection, nim: &str) -> DynoRes
     dsl::users
         .select(dsl::id)
         .filter(dsl::nim.eq(nim))
-        .first::<i32>(conn)
+        .first::<i64>(conn)
         .optional()
         .map_err(DynoErr::database_error)
         .map(|x| x.is_some())
