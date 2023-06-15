@@ -9,14 +9,17 @@ yew-router = "0.17"
 gloo = "0.8"
 wasm-logger = "0.2.0"
 yew_icons = { version = "0.7.2", features = ["heroicons_outline", "heroicons_solid"] }
+yewdux = "0.9.3"
 
 [dependencies.web-sys]
 version = "0.3"
 features = [
     "HtmlInputElement",
+    "Window",
+    "Document",
+    "Element"
 ]
 
 [dependencies.dyno_core]
 workspace = true
-default-features = false
-features = ["use_wasm"]
+features = ["use_wasm", "use_excel"]

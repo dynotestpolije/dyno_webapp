@@ -1,5 +1,5 @@
-use web_sys::HtmlInputElement;
-use yew::prelude::*;
+use web_sys::{Event, HtmlInputElement};
+use yew::{classes, html, AttrValue, Callback, Classes, Component, Properties, TargetCast};
 
 #[derive(PartialEq, Properties)]
 pub struct TextInputProps {
@@ -13,7 +13,13 @@ pub struct TextInputProps {
     #[prop_or_default]
     pub placeholder: AttrValue,
 
-    pub update_callback: Callback<String>,
+    #[prop_or_default]
+    pub border: Classes,
+
+    #[prop_or_default]
+    pub required: bool,
+
+    pub update_callback: Callback<AttrValue>,
 }
 
 pub struct TextInput;
@@ -33,28 +39,36 @@ impl Component for TextInput {
             title,
             types,
             placeholder,
-            update_callback: onupdatevalue,
+            required,
+            update_callback,
+            border,
         } = ctx.props();
+
+        let onupdatevalue = update_callback.clone();
 
         html! {
         <div class={classes!("form-control", "w-full", class.clone())}>
-            <label class="label"> 
-                <span class={"label-text text-base-content"}> 
-                    {title}
+            <label class="label">
+                <span class={"label-text text-base-content"}>
+                    {title.clone()}
                 </span>
             </label>
             <input
-                type={types}
-                value={value}
-                placeholder={placeholder}
-                onchange={|e: Event| {
+                id={types.clone()}
+                name={types.clone()}
+                type={types.clone()}
+                autoComplete={types.clone()}
+                value={value.clone()}
+                placeholder={placeholder.clone()}
+                onchange={move |e: Event| {
                     e.prevent_default();
                     let input = e.target_dyn_into::<HtmlInputElement>();
                     if let Some(input) = input {
                         onupdatevalue.emit(input.value().into());
                     }
                 }}
-                class="input  input-bordered w-full "
+                class={classes!("input", "input-bordered", "w-full", border.clone())}
+                required={*required}
             />
         </div>
         }

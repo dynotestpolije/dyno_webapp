@@ -12,9 +12,10 @@ pub use manager::NotificationsManager;
 pub use provider::{NotificationsPosition, NotificationsProvider, NotificationsProviderProps};
 
 use dyno_core::{
-    chrono::{Duration, Local, NaiveDateTime},
+    chrono::{Local, NaiveDateTime},
     uuid::Uuid,
 };
+use std::time::Duration;
 use yew::{html::Scope, prelude::*};
 
 /// Every notification has such thing as *lifetime*.
@@ -61,11 +62,15 @@ pub trait NotifiableComponentFactory<T: Notifiable> {
     ) -> Html;
 }
 pub trait LinkNotification {
-    fn notif(&self, v: Notification);
+    fn notif(&self, notification: Notification);
 }
 
-impl<COMP: BaseComponent> LinkNotification for Scope<COMP> {
-    fn notif(&self, v: Notification) {}
+impl<COMP: Component> LinkNotification for Scope<COMP> {
+    fn notif(&self, notification: Notification) {
+        self.context::<NotificationsManager<Notification>>(Callback::noop())
+            .map(|(ctx, _)| ctx.spawn(notification))
+            .unwrap_or_default()
+    }
 }
 
 #[hook]
@@ -83,32 +88,26 @@ pub fn format_date_time(datetime: &NaiveDateTime) -> String {
 // lifetime: Duration,
 #[macro_export]
 macro_rules! notif_macros {
-    ($t:ty, $title:expr, $($text:tt)*) => {
+    ($t:ident, $title:expr, $($text:tt)*) => {
         $crate::components::notification::Notification::new(
-            $t,
+            $crate::components::notification::NotificationType::$t,
             $title,
             format!($($text)*),
-            dyno_core::chrono::Duration::second(4)
+            std::time::Duration::from_secs(4)
         )
     };
 }
 
 #[macro_export]
 macro_rules! notif_info {
-    ($($args:tt)*) => ($crate::notif_macros!(
-        $crate::components::notification::NotificationType::Info, $($args)*)
-    );
+    ($($args:tt)*) => ($crate::notif_macros!( Info, $($args)*));
 }
 #[macro_export]
 macro_rules! notif_warn {
-    ($($args:tt)*) => ($crate::notif_macros!(
-        $crate::components::notification::NotificationType::Warn, $($args)*)
-    );
+    ($($args:tt)*) => ($crate::notif_macros!( Warn, $($args)*));
 }
 
 #[macro_export]
 macro_rules! notif_error {
-    ($($args:tt)*) => ($crate::notif_macros!(
-        $crate::components::notification::NotificationType::Error, $($args)*)
-    );
+    ($($args:tt)*) => ($crate::notif_macros!( Error, $($args)*));
 }

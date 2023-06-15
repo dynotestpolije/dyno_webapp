@@ -1,5 +1,5 @@
-use web_sys::HtmlInputElement;
-use yew::prelude::*;
+use web_sys::{Event, HtmlInputElement};
+use yew::{classes, html, AttrValue, Callback, Classes, Component, Properties, TargetCast};
 
 #[derive(PartialEq, Properties)]
 pub struct InputTextAreaProps {
@@ -34,19 +34,20 @@ impl Component for InputTextArea {
             placeholder,
             update_callback,
         } = ctx.props();
+        let update_callback = update_callback.clone();
 
         html! {
-            <div class={classes!("form-control", "w-full", *container_class)}>
+            <div class={classes!("form-control", "w-full", container_class.clone())}>
                 <label class="label">
-                    <span class={classes!("label-text", "text-base-content", *label_class)}>
-                        {title}
+                    <span class={classes!("label-text", "text-base-content", label_class.clone())}>
+                        {title.clone()}
                     </span>
                 </label>
                 <textarea
-                    value={value}
+                    value={value.clone()}
                     class="textarea textarea-bordered w-full"
-                    placeholder={placeholder}
-                    onchange={|e: Event| {
+                    placeholder={placeholder.clone()}
+                    onchange={move |e: Event| {
                         e.prevent_default();
                         let input = e.target_dyn_into::<HtmlInputElement>();
                         if let Some(input) = input {

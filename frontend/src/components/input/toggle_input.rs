@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, str::FromStr};
 
-use web_sys::HtmlInputElement;
-use yew::prelude::*;
+use web_sys::{Event, HtmlInputElement};
+use yew::{classes, html, AttrValue, Callback, Classes, Component, Properties, TargetCast};
 
 #[derive(PartialEq, Properties)]
 pub struct SearchBarProps<V: PartialEq> {
@@ -45,22 +45,24 @@ where
             update_callback,
         } = ctx.props();
 
+        let update_callback = update_callback.clone();
+
         html! {
-        <div class={classes!("form-control", "w-full", *container_class)}>
+        <div class={classes!("form-control", "w-full", container_class.clone())}>
             <label class="label cursor-pointer">
-                <span class={classes!("label-text", "text-base-content", *label_class)}>
+                <span class={classes!("label-text", "text-base-content", label_class.clone())}>
                     {title}
                 </span>
                 <input
-                    type="checkbox"
+                    placeholder={placeholder.clone()}
+                    type={types.clone()}
                     class="toggle"
                     checked={*checked}
                     value={value.to_string()}
-                    onchange={|e: Event| {
+                    onchange={move |e: Event| {
                         e.prevent_default();
                         let input = e.target_dyn_into::<HtmlInputElement>();
                         if let Some(input) = input {
-                            let input_value = input.value();
                             update_callback.emit(input.value().parse().ok())
                         }
                     }

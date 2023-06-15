@@ -1,4 +1,4 @@
-use yew::prelude::*;
+use yew::{classes, function_component, html, Children, Classes, Html, Properties};
 
 #[derive(Debug, Clone, PartialEq, Properties)]
 pub struct TypoGraphyComps {

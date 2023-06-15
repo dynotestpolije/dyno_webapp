@@ -17,3 +17,7 @@ sudo apt install libmysqlclient-dev
 
 cargo install diesel_cli --no-default-features --features sqlite
 ``` 
+
+
+## TEST REQUEST
+login: curl -d'{"nim":"e32201406","password":"password123"}' -H 'Content-Type: application/json' -X POST http://localhost:8080/api/auth/login -v

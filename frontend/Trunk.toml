@@ -6,15 +6,15 @@ filehash = false
 public_url = "/"
 
 [watch]
-watch = ["src/", "static/", "index.html"]
+watch = ["src/", "index.html"]
 
 [clean]
-dist = "dist"
+dist = "../public/root"
 
 [[hooks]]
 stage = "pre_build"
 command = "sh"
-command_arguments = ["-c", "[ ! -d \"./node_modules\" ] && npm i || :; npm run build:dev" ]
+command_arguments = ["-c", "[ ! -d \"./node_modules\" ] && npm i || :; npm run build" ]
 
 [serve]
 address = "127.0.0.1"

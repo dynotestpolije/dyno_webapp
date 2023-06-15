@@ -3,11 +3,11 @@
 
 CREATE TABLE IF NOT EXISTS dyno_info (
     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    motor_type INTEGER NOT NULL default 1,
+    motor_type SMALLINT NOT NULL default 1,
     name TEXT,
-    cc INTEGER,
-    cylinder INTEGER,
-    stroke INTEGER,
+    cc SMALLINT,
+    cylinder SMALLINT,
+    stroke SMALLINT,
     diameter_roller REAL,
     diameter_roller_beban REAL,
     diameter_gear_encoder REAL,

@@ -1,7 +1,7 @@
-use std::fmt::Debug;
 use std::rc::Rc;
+use std::{fmt::Debug, time::Duration};
 
-use super::{Duration, Notifiable, Reducible, UseReducerDispatcher, Uuid};
+use super::{Notifiable, Reducible, UseReducerDispatcher, Uuid};
 
 /// Returned object from the `use_notification` hook. Can spawn new notifications.
 #[derive(Clone, PartialEq)]
@@ -50,7 +50,7 @@ impl<N> Default for NotificationsList<N> {
 
 impl<N> NotificationsList<N> {
     pub const TIME_TICK_MILLIS: usize = 1000; // every second
-    pub const TIME_TICK_DURATION: Duration = Duration::seconds(1);
+    pub const TIME_TICK_DURATION: Duration = Duration::from_secs(1);
 
     pub fn is_empty(&self) -> bool {
         self.notifications.is_empty()

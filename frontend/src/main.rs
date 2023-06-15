@@ -4,50 +4,76 @@ mod components;
 mod containers;
 mod pages;
 mod route;
+mod state;
+mod theme;
 
-use yew::prelude::*;
-use yew_router::BrowserRouter;
+use yew::{function_component, html, Html, Suspense};
+use yew_router::{prelude::use_route, BrowserRouter, Routable};
 
-use route::{LinkTag, Route, Switch};
+use route::{LinkTag, Route};
+use yewdux::prelude::use_store;
 
-use components::notification::{Notification, NotificationFactory, NotificationsProvider};
+use crate::containers::suspend::SuspenseContent;
+use theme::Theme;
+
+use crate::{
+    containers::layout::Layout,
+    pages::{
+        admin::{PageAdminDynos, PageAdminHistory, PageAdminInfos, PageAdminUsers},
+        setting::{PageSettingApps, PageSettingProfile},
+        PageAbout, PageActivities, PageCalendar, PageDashboard, PageNotFound, PageSignIn,
+        PageSignUp, PageSop,
+    },
+};
 
 const USER_SESSION_OBJ_KEY: &str = "dyno_user_session";
-const USER_TOKEN: &str = "dyno_token";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AppMsg {
-    Nope,
+macro_rules! with_layout {
+    ($($args:tt)*) => (html! { <Layout> $($args)* </Layout> })
 }
 
-#[derive(Debug, Clone, Default)]
-struct App;
-
-impl Component for App {
-    type Message = AppMsg;
-
-    type Properties = ();
-
-    fn create(ctx: &Context<Self>) -> Self {
-        Self
-    }
-
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        true
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let component_creator = NotificationFactory::default();
-
-        html! {
-            <NotificationsProvider<Notification, NotificationFactory> {component_creator}>
-
-                <BrowserRouter basename="/">
-                    <Switch  session={self.session} />
-                </BrowserRouter>
-
-            </NotificationsProvider<Notification, NotificationFactory>>
+#[function_component(App)]
+fn app() -> Html {
+    let (state, _) = use_store::<state::AppState>();
+    let route = use_route::<Route>().map(|p| match state.token().is_none() {
+        true => {
+            if matches!(p, Route::SignIn | Route::SignUp) {
+                p
+            } else {
+                Route::SignIn
+            }
         }
+        false => p,
+    });
+    let route_html = match route {
+        Some(route) => {
+            dyno_core::log::debug!("switching router to: `{}`", route.to_path());
+            match route {
+                Route::SignIn => html! { <PageSignIn /> },
+                Route::SignUp => html! { <PageSignUp /> },
+                Route::Dashboard => with_layout!(<PageDashboard/>),
+                Route::Sop => with_layout!(<PageSop/>),
+                Route::About => with_layout!(<PageAbout/>),
+                Route::Kalendar => with_layout!(<PageCalendar/>),
+                Route::Activities => with_layout!(<PageActivities/>),
+                Route::SettingProfile => with_layout!(<PageSettingProfile />),
+                Route::SettingApp => with_layout!(<PageSettingApps />),
+                Route::AdminDynos => with_layout!(<PageAdminDynos />),
+                Route::AdminUsers => with_layout!(<PageAdminUsers />),
+                Route::AdminInfos => with_layout!(<PageAdminInfos />),
+                Route::AdminHistory => with_layout!(<PageAdminHistory />),
+                Route::NotFound => with_layout!(<PageNotFound />),
+            }
+        }
+        None => html! { <PageNotFound /> },
+    };
+
+    html! {
+        <Suspense fallback={html!(<SuspenseContent />)}>
+            <BrowserRouter basename="/">
+                {route_html}
+            </BrowserRouter>
+        </Suspense>
     }
 }
 

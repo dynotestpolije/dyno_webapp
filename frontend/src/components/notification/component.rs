@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::{
     classes, format_date_time, function_component, html, Callback, Classes, Duration, Html, Local,
     MouseEvent, NaiveDateTime, Notifiable, NotifiableComponentFactory, Properties, Uuid,
@@ -60,8 +62,7 @@ pub struct Notification {
 }
 
 impl Notification {
-    pub const NOTIFICATION_LIFETIME: Duration = Duration::seconds(3);
-
+    const NOTIFICATION_LIFETIME: Duration = Duration::from_secs(3);
     /// Creates a new standard notification from notification type, title, text, and lifetime duration.
     pub fn new(
         notification_type: NotificationType,
@@ -219,11 +220,11 @@ impl Notifiable for Notification {
     }
 
     fn apply_tick(&mut self, time: Duration) {
-        self.lifetime = self.lifetime.checked_sub(&time).unwrap_or(Duration::zero());
+        self.lifetime = self.lifetime.checked_sub(time).unwrap_or(Duration::ZERO);
     }
 
     fn is_alive(&self) -> bool {
-        self.lifetime != Duration::zero()
+        self.lifetime.is_zero()
     }
 
     fn mouse_in(&mut self) {

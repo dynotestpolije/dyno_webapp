@@ -1,5 +1,5 @@
-use web_sys::HtmlInputElement;
-use yew::prelude::*;
+use web_sys::{Event, HtmlInputElement};
+use yew::{classes, html, AttrValue, Callback, Classes, Component, Properties, TargetCast};
 
 #[derive(PartialEq, Properties)]
 pub struct SearchBarProps {
@@ -30,14 +30,15 @@ impl Component for SearchBar {
             update_callback,
         } = ctx.props();
 
+        let update_callback = update_callback.clone();
         html! {
-            <div class={classes!("inline-block", *style_class)}>
+            <div class={classes!("inline-block", style_class.clone())}>
                 <div class="input-group  relative flex flex-wrap items-stretch w-full">
                 <input
                     type="search"
-                    value={value}
-                    placeholder={placeholder}
-                    onchange={|e: Event| {
+                    value={value.clone()}
+                    placeholder={placeholder.clone()}
+                    onchange={move |e: Event| {
                         e.prevent_default();
                         let input = e.target_dyn_into::<HtmlInputElement>();
                         if let Some(input) = input {

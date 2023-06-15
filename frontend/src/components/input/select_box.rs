@@ -1,13 +1,17 @@
-use web_sys::HtmlInputElement;
-use yew::prelude::*;
+use web_sys::{Event, HtmlInputElement};
+use yew::{
+    classes, function_component, html, AttrValue, Callback, Children, Classes, Component,
+    Properties, TargetCast,
+};
 use yew_icons::{Icon, IconId::HeroiconsOutlineInformationCircle};
 
 #[derive(Debug, Clone, PartialEq, Properties)]
 pub struct SelectBoxProps {
     #[prop_or(From::from("Check Box"))]
     pub title: AttrValue,
-    pub desc: Option<AttrValue>,
 
+    #[prop_or_default]
+    pub desc: Option<AttrValue>,
     #[prop_or_default]
     pub value: AttrValue,
     #[prop_or_default]
@@ -17,8 +21,8 @@ pub struct SelectBoxProps {
     #[prop_or(From::from("Search"))]
     pub placeholder: AttrValue,
 
-    // (value, key)
-    pub options: Vec<SelectOption>,
+    #[prop_or_default]
+    pub children: Children,
 
     pub update_callback: Callback<String>,
 }
@@ -42,11 +46,14 @@ impl Component for SelectBox {
             desc,
             container_class,
             label_class,
-            options,
+            children,
         } = ctx.props();
+
+        let update_callback = update_callback.clone();
+
         let description = if desc.is_none() {
             html! {
-                <div class={classes!("tooltip", "tooltip-right")} data-tip={desc} >
+                <div class={classes!("tooltip", "tooltip-right")} data-tip={desc.clone()} >
                     <Icon icon_id={HeroiconsOutlineInformationCircle} class="w-4 h-4"/>
                 </div>
             }
@@ -55,57 +62,42 @@ impl Component for SelectBox {
         };
 
         html! {
-        <div class={classes!("inline-block", *container_class)}>
-            <label class={classes!("label", *label_class)}>
-                <div class="label-text"> {title} {description} </div>
+        <div class={classes!("inline-block", container_class.clone())}>
+            <label class={classes!("label", label_class.clone())}>
+                <div class="label-text"> {title.clone()} {description} </div>
             </label>
 
             <select
                 class="select select-bordered w-full"
-                value={default_value}
-                onchange={|e: Event| {
+                value={default_value.clone()}
+                onchange={move |e: Event| {
                     e.prevent_default();
                     let input = e.target_dyn_into::<HtmlInputElement>();
                     if let Some(input) = input {
-                        update_callback.emit(input.value().into());
+                        update_callback.emit(input.value());
                     }
                 }}
             >
-                <option disabled=true value="PLACEHOLDER">{placeholder}</option>
-                {
-                    for options
-                        .into_iter()
-                        .enumerate()
-                        .map(|(key, SelectOption { name, value })| html!{
-                            <option value={value} key={key}>{name}</option>
-                        })
-                }
+                <option disabled=true value={default_value.clone()}>{placeholder.clone()}</option>
+                {children.clone()}
             </select>
         </div>
         }
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct SelectOption {
+#[derive(Debug, Clone, Default, PartialEq, Properties)]
+pub struct SelectOptionProps {
     pub name: AttrValue,
     pub value: AttrValue,
+
+    #[prop_or_default]
+    pub disable: bool,
 }
 
-impl SelectOption {
-    pub fn new(key: impl Into<AttrValue>, value: impl Into<AttrValue>) -> Self {
-        let key = key.into();
-        let value = value.into();
-        Self { name: key, value }
-    }
-}
-
-impl<K, V> From<(K, V)> for SelectOption
-where
-    K: Into<AttrValue>,
-    V: Into<AttrValue>,
-{
-    fn from(value: (K, V)) -> Self {
-        Self::new(value.0, value.1)
+#[function_component(SelectOption)]
+pub fn select_option(props: &SelectOptionProps) -> yew::Html {
+    html! {
+        <option disabled={props.disable} value={props.value.clone()} key={props.value.as_str()}>{props.name.clone()}</option>
     }
 }

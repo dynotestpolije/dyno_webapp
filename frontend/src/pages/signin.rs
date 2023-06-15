@@ -1,176 +1,157 @@
-use gloo::storage::{LocalStorage, Storage};
+use dyno_core::crypto::TokenDetails;
 use yew::prelude::*;
+use yewdux::prelude::Dispatch;
 
 use crate::components::{input::TextInput, landing_intro::LandingIntro, typography::ErrorText};
+use crate::state::AppState;
 use crate::{LinkTag, Route};
 
 use dyno_core::users::UserLogin;
-use dyno_core::{ApiResponse, DynoErr, UserSession};
+use dyno_core::{ApiResponse, DynoErr, DynoResult, UserSession};
 
-enum SignInMsg {
-    OnResponseSubmit(ApiResponse<UserSession>),
-    OnResponseError(ApiResponse<DynoErr>),
-    OnUpdateNim(String),
-    OnUpdatePassword(String),
-    OnErrorMsg(String),
-    OnLoading(bool),
-}
-impl SignInMsg {
-    #[inline]
-    const fn pswd(v: String) -> Self {
-        Self::OnUpdatePassword(v)
-    }
-    #[inline]
-    const fn nim(v: String) -> Self {
-        Self::OnUpdateNim(v)
-    }
+#[function_component(PageSignIn)]
+pub fn signin() -> yew::Html {
+    let loading = use_state(bool::default);
+    let nim = use_state(AttrValue::default);
+    let password = use_state(AttrValue::default);
+    let error = use_state(AttrValue::default);
 
-    #[inline]
-    fn on_err(err: impl ToString) -> Self {
-        Self::OnErrorMsg(err.to_string())
-    }
-}
+    let class_loading = if *loading { "loading" } else { "" };
 
-#[derive(Debug, Clone, Properties, PartialEq)]
-pub struct Name {
-    setter: UseStateSetter<Option<UserSession>>,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct PageSignIn {
-    data: UserLogin,
-    loading: bool,
-    error_msg: String,
-}
-
-impl PageSignIn {
-    async fn submit_login(data: UserLogin) -> SignInMsg {
-        match gloo::net::http::Request::get("/api/auth/login").json(&data) {
-            Ok(req) => match req.send().await {
-                Ok(response) => {
-                    let headers = response.headers();
-                    match headers.get("Authorization") {
-                        Some(token) => {
-                            if let Err(err) = LocalStorage::set(crate::USER_TOKEN, token) {
-                                dyno_core::log::error!("Failed set data in LocalStorage: {err}")
-                            }
-                        }
-                        None => return SignInMsg::on_err("Something Bad Happen."),
-                    }
-                    if response.ok() {
-                        match response.json::<ApiResponse<UserSession>>().await {
-                            Ok(json) => SignInMsg::OnResponseSubmit(json),
-                            Err(err) => SignInMsg::on_err(err),
-                        }
-                    } else {
-                        match response.json::<ApiResponse<DynoErr>>().await {
-                            Ok(json) => SignInMsg::OnResponseError(json),
-                            Err(err) => SignInMsg::on_err(err),
-                        }
-                    }
-                }
-                Err(err) => SignInMsg::on_err(err),
-            },
-            Err(err) => SignInMsg::OnErrorMsg(err.to_string()),
-        }
-    }
-}
-
-impl Component for PageSignIn {
-    type Message = SignInMsg;
-
-    type Properties = ();
-
-    fn create(_ctx: &Context<Self>) -> Self {
-        Self::default()
-    }
-
-    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {
-            SignInMsg::OnUpdateNim(nim) => self.data.nim = nim,
-            SignInMsg::OnUpdatePassword(password) => self.data.password = password,
-            SignInMsg::OnErrorMsg(error) => self.error_msg = error,
-            SignInMsg::OnLoading(loading) => self.loading = loading,
-            SignInMsg::OnResponseSubmit(submit) => {}
-            SignInMsg::OnResponseError(_) => {}
-        }
-
-        true
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        let link = ctx.link();
-        let class_loading = if self.loading { "loading" } else { "" };
-        let nim_value = AttrValue::from(self.data.nim.clone());
-        let pswd_value = AttrValue::from(self.data.password.clone());
-
-        let data = self.data.clone();
-        let onsubmitlogin = link.callback_future(move |e: SubmitEvent| {
+    let onsubmitlogin = {
+        let nim = nim.to_string();
+        let password = password.to_string();
+        let loading = loading.setter();
+        let error = error.setter();
+        Dispatch::<AppState>::new().reduce_mut_future_callback_with(move |state, e: SubmitEvent| {
             e.prevent_default();
-            Self::submit_login(data)
-        });
+            let loading = loading.clone();
+            let error = error.clone();
+            let data = UserLogin {
+                nim: nim.clone(),
+                password: password.clone(),
+            };
 
-        let onupdate_nim = link.callback(move |val: String| Self::Message::nim(val));
-        let onupdate_pswd = link.callback(move |val: String| Self::Message::pswd(val));
+            Box::pin(async move {
+                loading.set(true);
+                match signin_submit(data).await {
+                    Ok(token) => state.change_token_details(token),
+                    Err(err) => error.set(err.to_string().into()),
+                }
+                loading.set(false);
+            })
+        })
+    };
 
-        let form_input = html! {
-        <form onsubmit={onsubmitlogin}>
-            <div class="mb-4">
-                <TextInput
-                    types="text"
-                    value={nim_value}
-                    class="mt-4"
-                    title="NIM/NIS"
-                    update_callback={onupdate_nim}
-                />
-                <TextInput
-                    types="password"
-                    value={pswd_value}
-                    class="mt-4"
-                    title="Password"
-                    update_callback={onupdate_pswd}
-                />
-            </div>
+    let nim_setter = use_callback(
+        move |s, dp| {
+            dp.set(s);
+        },
+        nim.clone(),
+    );
+    let password_setter = use_callback(
+        move |s, dp| {
+            dp.set(s);
+        },
+        password.clone(),
+    );
 
-            <div class="text-right text-primary">
-                <LinkTag to={Route::NotFound}>
-                <span class=
-                    "text-sm inline-block hover:text-primary hover:underline hover:cursor-pointer transition duration-200"
-                >
-                    {"Forgot Password?"}
-                </span>
-                </LinkTag>
-            </div>
+    let form_input = html! {
+    <form onsubmit={onsubmitlogin}>
+        <div class="mb-4">
+            <TextInput
+                types="text"
+                value={nim.to_string()}
+                class="mt-4"
+                title="NIM/Email"
+                placeholder="Nim/Email"
+                update_callback={nim_setter}
+            />
+            <TextInput
+                types="password"
+                value={password.to_string()}
+                class="mt-4"
+                title="Password"
+                placeholder="Password"
+                update_callback={password_setter}
+            />
+        </div>
 
-            <ErrorText class="mt-8" >
-                {self.error_msg.clone()}
-            </ErrorText>
-            <button type="submit" class={classes!("btn", "mt-2", "w-full", "btn-primary", class_loading)}>{"Login"}</button>
+        <div class="text-right text-primary">
+            <LinkTag to={Route::NotFound}>
+            <span class=
+                "text-sm inline-block hover:text-primary hover:underline hover:cursor-pointer transition duration-200"
+            >
+                {"Forgot Password?"}
+            </span>
+            </LinkTag>
+        </div>
 
-            <div class="text-center mt-4">{"Don't have an account yet?"}
-                <LinkTag to={Route::SignUp}>
-                <span class="inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">
-                    {"Register"}
-                </span>
-                </LinkTag>
-            </div>
-        </form>
-        };
+        <ErrorText class="mt-8" > {error.as_ref()} </ErrorText>
+        <button type="submit" class={classes!("btn", "mt-2", "w-full", "btn-primary", class_loading)}>{"Login"}</button>
 
-        html! {
-        <div class="min-h-screen bg-base-200 flex items-center">
-            <div class="card mx-auto w-full max-w-5xl  shadow-xl">
-                <div class="grid  md:grid-cols-2 grid-cols-1  bg-base-100 rounded-xl">
-                    <div class="">
-                        <LandingIntro />
-                    </div>
-                    <div class="py-24 px-10">
-                        <h2 class="text-2xl font-semibold mb-2 text-center">{"Login"}</h2>
-                        {form_input}
-                    </div>
+        <div class="text-center mt-4">{"Don't have an account yet? "}
+            <LinkTag to={Route::SignUp}>
+            <span class="inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200">
+                {"Register"}
+            </span>
+            </LinkTag>
+        </div>
+    </form>
+    };
+
+    html! {
+    <div class="min-h-screen bg-base-200 flex items-center">
+        <div class="card mx-auto w-full max-w-5xl  shadow-xl">
+            <div class="grid  md:grid-cols-2 grid-cols-1  bg-base-100 rounded-xl">
+                <div class="">
+                    <LandingIntro />
+                </div>
+                <div class="py-24 px-10">
+                    <h2 class="text-2xl font-semibold mb-2 text-center">{"Login"}</h2>
+                    {form_input}
                 </div>
             </div>
         </div>
-        }
+    </div>
+    }
+}
+
+async fn signin_submit(data: UserLogin) -> DynoResult<TokenDetails> {
+    if cfg!(debug_assertions) {
+        return Ok(TokenDetails {
+            user: UserSession {
+                id: 1,
+                uuid: dyno_core::uuid::Uuid::new_v4(),
+                role: dyno_core::role::Roles::Admin,
+            },
+            token_id: dyno_core::uuid::Uuid::new_v4(),
+            expires_in: None,
+            token: None,
+        });
+    }
+    match gloo::net::http::Request::post("/api/auth/login").json(&data) {
+        Ok(req) => match req.send().await {
+            Ok(response) => {
+                if response.ok() {
+                    response
+                        .json::<ApiResponse<TokenDetails>>()
+                        .await
+                        .map(|x| x.payload)
+                        .map_err(DynoErr::api_error)
+                } else {
+                    match response
+                        .json::<ApiResponse<DynoErr>>()
+                        .await
+                        .map(|x| x.payload)
+                    {
+                        Ok(err) => Err(err),
+                        Err(err) => Err(DynoErr::api_error(err)),
+                    }
+                }
+            }
+            Err(err) => Err(DynoErr::api_error(err)),
+        },
+        Err(err) => Err(DynoErr::api_error(err)),
     }
 }
