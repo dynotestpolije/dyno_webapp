@@ -9,4 +9,5 @@ Cargo.lock
 docker-compose.yml
 
 log
+**/public
 
