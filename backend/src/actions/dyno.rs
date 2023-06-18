@@ -5,6 +5,19 @@ use dyno_core::{DynoErr, DynoResult};
 
 #[inline]
 #[allow(unused)]
+pub fn get_last_id(conn: &mut DynoDBPooledConnection) -> DynoResult<i64> {
+    use crate::schema::dynos::dsl;
+    dsl::dynos
+        .select(dsl::id)
+        .order(dsl::id.desc())
+        .first::<i64>(conn)
+        .optional()
+        .map_err(DynoErr::database_error)
+        .map(|x| x.unwrap_or(1))
+}
+
+#[inline]
+#[allow(unused)]
 pub fn is_exists(conn: &mut DynoDBPooledConnection, id: i64, user_id: i64) -> DynoResult<bool> {
     use crate::schema::dynos::dsl;
     dsl::dynos
@@ -55,14 +68,26 @@ pub fn insert(conn: &mut DynoDBPooledConnection, new: NewDynos) -> DynoResult<i6
 
 #[inline]
 #[allow(unused)]
-pub fn select_many(
+pub fn select_many(conn: &mut DynoDBPooledConnection, user_id: i64) -> DynoResult<Vec<Dynos>> {
+    use crate::schema::dynos;
+    dynos::table
+        .filter(dynos::dsl::user_id.eq(user_id))
+        .select(Dynos::as_select())
+        .get_results::<Dynos>(conn)
+        .optional()
+        .map_err(DynoErr::database_error)?
+        .ok_or(DynoErr::database_error("Dynos record not exists in table"))
+}
+
+#[inline]
+#[allow(unused)]
+pub fn select_many_limit(
     conn: &mut DynoDBPooledConnection,
     user_id: i64,
-    limit: Option<u32>,
+    limit: i64,
 ) -> DynoResult<Vec<Dynos>> {
     use crate::schema::dynos;
 
-    let limit = limit.unwrap_or(5) as _;
     dynos::table
         .filter(dynos::dsl::user_id.eq(user_id))
         .select(Dynos::as_select())

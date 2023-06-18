@@ -8,19 +8,14 @@ use dyno_core::{DynoErr, DynoResult};
 
 #[inline]
 #[allow(unused)]
-pub fn is_exists(
-    conn: &mut DynoDBPooledConnection,
-    id: i64,
-    name: impl AsRef<str>,
-) -> DynoResult<bool> {
+pub fn is_exists(conn: &mut DynoDBPooledConnection, name: impl AsRef<str>) -> Option<i64> {
     let name = name.as_ref();
     dsl::dyno_info
         .select(dsl::id)
-        .filter(dsl::id.eq(id).and(dsl::name.eq(name)))
+        .filter(dsl::name.eq(name))
         .first::<i64>(conn)
         .optional()
-        .map_err(DynoErr::database_error)
-        .map(|x| x.is_some())
+        .unwrap_or(None)
 }
 
 #[inline]
@@ -38,6 +33,9 @@ pub fn select(conn: &mut DynoDBPooledConnection, id: i64) -> DynoResult<DynoInfo
 #[inline]
 #[allow(unused)]
 pub fn insert(conn: &mut DynoDBPooledConnection, new: NewDynoInfo) -> DynoResult<i64> {
+    if let Some(id) = is_exists(conn, new.name.clone().unwrap_or_default()) {
+        return Ok(id);
+    }
     diesel::insert_into(dsl::dyno_info)
         .values(new)
         .returning(dsl::id)

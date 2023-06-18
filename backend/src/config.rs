@@ -6,9 +6,9 @@ use std::process::exit;
 pub fn get_env<S: AsRef<str>>(env: S) -> String {
     let env = env.as_ref();
     match std::env::var(env) {
-        Ok(path) => {
-            log::debug!("ENV Variable - [{env}:`{path}`]");
-            path
+        Ok(value) => {
+            log::debug!("Success getting ENV: [{env}]");
+            value
         }
         Err(err) => {
             log::error!("Failed to get config paths for ENV:`{env}` - {err}");
@@ -21,9 +21,9 @@ pub fn get_env<S: AsRef<str>>(env: S) -> String {
 pub fn get_env_optional<S: AsRef<str>>(env: S) -> Option<String> {
     let env = env.as_ref();
     match std::env::var(env) {
-        Ok(path) => {
-            log::debug!("ENV Variable - [{env}:`{path}`]");
-            Some(path)
+        Ok(value) => {
+            log::debug!("Success getting ENV: [{env}]");
+            Some(value)
         }
         Err(_) => None,
     }

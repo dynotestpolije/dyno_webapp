@@ -4,11 +4,14 @@ mod handler;
 mod middlewares;
 mod models;
 mod schema;
+mod seeder;
+
+use std::sync::{Arc, Mutex};
 
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{self, guard, http::header, middleware::Logger, web, App, HttpServer};
-use dyno_core::{log, DynoErr, DynoResult};
+use dyno_core::{log, DynoConfig, DynoErr, DynoResult, UserSession};
 
 // TODO: should i implement other databases?
 #[cfg(feature = "db_sqlite")]
@@ -19,6 +22,7 @@ mod db {
     pub type DynoDBPooledConnection = diesel::r2d2::PooledConnection<DynoDBConnManager>;
 }
 use db::*;
+use models::ActiveUser;
 
 #[actix_web::main]
 async fn main() -> DynoResult<()> {
@@ -44,26 +48,25 @@ async fn main() -> DynoResult<()> {
         },
     );
     let root_path = get_and_check_path(&app_state.cfg.app_public_path, "root");
-    let dyno_path = get_and_check_path(&app_state.cfg.app_public_path, "dyno");
 
     let http_server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
             .wrap(
                 Cors::default() // allowed_origin return access-control-allow-origin: * by default
-                    .allowed_origin("http://localhost:8080")
+                    .allow_any_origin()
                     .allowed_methods(["GET", "POST", "PUT", "DELETE"])
                     .allowed_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
-                    .max_age(3600)
+                    .max_age(3600),
             )
             .wrap(Logger::default())
-            .service(handler::api())
+            .configure(handler::api)
             // .service(web::redirect("/", "/index.html"))
-            .service(Files::new("/", root_path.clone()).index_file("index.html"))
             .service(
-                Files::new("/dyno", dyno_path.clone())
-                    .method_guard(guard::Get())
-                    .show_files_listing(),
+                Files::new("/", root_path.clone())
+                    .index_file("index.html")
+                    .show_files_listing()
+                    .guard(guard::Get()),
             )
     });
     if let Some(tls) = tls_acceptor {
@@ -85,6 +88,39 @@ async fn main() -> DynoResult<()> {
 pub struct ServerState {
     pub db: DynoDBPool,
     pub cfg: config::ServerConfig,
+
+    pub active: Arc<Mutex<Option<ActiveUser>>>,
+}
+impl ServerState {
+    pub fn new() -> DynoResult<Self> {
+        server_init()
+    }
+
+    pub fn change_active_user(&self, user: UserSession) {
+        let Ok(mut active_lock) = self.active.lock() else { return; };
+        if let Some(active) = active_lock.clone() {
+            *active_lock = Some(active.set_user(user));
+        } else {
+            *active_lock = Some(ActiveUser::new().set_user(user));
+        }
+    }
+    pub fn change_active_dyno(&self, dyno: DynoConfig) {
+        let Ok(mut active_lock) = self.active.lock() else { return; };
+        if let Some(active) = active_lock.clone() {
+            *active_lock = Some(active.set_dyno(dyno));
+        } else {
+            *active_lock = Some(ActiveUser::new().set_dyno(dyno));
+        }
+    }
+    pub fn set_active(&self, other: Option<ActiveUser>) {
+        let Ok(mut active) = self.active.lock() else { return; };
+        *active = other;
+    }
+
+    pub fn get_active(&self) -> Option<ActiveUser> {
+        let Ok(active) = self.active.lock() else { return None; };
+        active.clone()
+    }
 }
 
 fn server_init() -> DynoResult<ServerState> {
@@ -93,35 +129,23 @@ fn server_init() -> DynoResult<ServerState> {
 
     match diesel::r2d2::Pool::builder().build(manager) {
         Ok(db) => {
-            #[cfg(debug_assertions)]
-            {
-                let mut conn = db.get().map_err(DynoErr::database_error)?;
-                let password = dyno_core::crypto::hash_password("password123")?;
-                let new_user = models::user::NewUser {
-                    uuid: models::uuid::UUID::new(),
-                    nim: "e32201406".to_owned(),
-                    name: "rizal".to_owned(),
-                    password,
-                    role: models::role::ROLES(dyno_core::role::Roles::Admin),
-                    email: Some("e32201406@student.polije.ac.id".to_owned()),
-                    photo: None,
-                };
-                if !matches!(actions::user::is_exists_by_id(&mut conn, 1), Ok(true)) {
-                    log::debug!(
-                        "seeding user in databases for debug purposes: {:?}",
-                        &new_user
-                    );
-
-                    let res = actions::user::insert_new(&mut conn, new_user)?;
-                    log::debug!("success seeding user returned: {}", &res);
-                }
-            }
-
             log::info!("✅ Connection to the database is successful!");
-            Ok(ServerState { db, cfg })
+            match db
+                .get()
+                .map_err(DynoErr::database_error)
+                .and_then(seeder::seeds)
+            {
+                Ok(()) => log::info!("✅ Seeding database is successful!"),
+                Err(err) => log::error!("❌ Failed to Seeding the database: {err}!"),
+            }
+            Ok(ServerState {
+                db,
+                cfg,
+                active: Default::default(),
+            })
         }
         Err(err) => Err(DynoErr::database_error(format!(
-            "Failed to connect to the database: {} - ({})",
+            "❌ Failed to connect to the database: {} - ({})",
             cfg.database_url, err
         ))),
     }

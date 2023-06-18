@@ -23,7 +23,7 @@ pub struct Dynos {
     pub user_id: i64,
     pub info_id: Option<i64>,
     pub uuid: UUID,
-    pub data_url: Option<String>,
+    pub data_url: String,
     pub data_checksum: String,
     pub verified: Option<bool>,
     pub start: NaiveDateTime,
@@ -40,10 +40,7 @@ impl Dynos {
             user_id: self.user_id,
             info_id: self.info_id,
             uuid: self.uuid.into_inner(),
-            data_url: self.data_url.unwrap_or(format!(
-                "/data/dyno/{}-{}-{}",
-                self.id, self.user_id, self.uuid
-            )),
+            data_url: self.data_url,
             data_checksum: self.data_checksum,
             verified: self.verified.is_some_and(|x| x),
             start: self.start,
@@ -61,6 +58,7 @@ pub struct NewDynos {
     pub user_id: i64,
     pub info_id: Option<i64>,
     pub uuid: UUID,
+    pub data_url: String,
     pub data_checksum: String,
     pub start: NaiveDateTime,
     pub stop: NaiveDateTime,
@@ -70,6 +68,7 @@ impl NewDynos {
     pub fn new(
         user_id: i64,
         info_id: Option<i64>,
+        data_url: impl ToString,
         DynoTestDataInfo {
             checksum_hex: data_checksum,
             start,
@@ -79,6 +78,7 @@ impl NewDynos {
     ) -> Self {
         Self {
             uuid: UUID::new(),
+            data_url: data_url.to_string(),
             user_id,
             info_id,
             data_checksum,

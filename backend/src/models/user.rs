@@ -30,8 +30,8 @@ pub struct User {
 }
 
 impl User {
-    pub fn into_user_response(self) -> DynoResult<UserResponse> {
-        Ok(UserResponse {
+    pub fn into_user_response(self) -> UserResponse {
+        UserResponse {
             id: self.id as _,
             uuid: self.uuid.into_inner(),
             nim: self.nim,
@@ -41,7 +41,7 @@ impl User {
             role: self.role.into_inner(),
             updated_at: self.updated_at,
             created_at: self.created_at,
-        })
+        }
     }
 }
 

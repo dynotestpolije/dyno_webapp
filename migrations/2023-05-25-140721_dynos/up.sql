@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS dynos (
     user_id INTEGER NOT NULL,
     info_id INTEGER DEFAULT 1,
     uuid TEXT NOT NULL,
-    data_url TEXT DEFAULT "",
+    data_url TEXT NOT NULL DEFAULT " ",
     data_checksum TEXT NOT NULL,
     verified BOOLEAN DEFAULT 0,
     start DATETIME NOT NULL,
@@ -14,10 +14,9 @@ CREATE TABLE IF NOT EXISTS dynos (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TRIGGER IF NOT EXISTS generate_data_url
-AFTER INSERT ON dynos
-BEGIN
-    UPDATE dynos SET data_url = '/data/dyno/' || CAST(NEW.id AS TEXT) || '-' || CAST(NEW.user_id AS TEXT) || '-' || NEW.uuid || '.bin' WHERE id = NEW.id;
-END;
-
-SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'generate_data_url'
+-- CREATE TRIGGER IF NOT EXISTS generate_data_url
+-- AFTER INSERT ON dynos
+-- BEGIN
+    -- UPDATE dynos SET data_url = '/data/dyno/' || CAST(NEW.id AS TEXT) || '-' || CAST(NEW.user_id AS TEXT) || '-' || NEW.uuid || '.bin' WHERE id = NEW.id;
+-- END;
+-- SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'generate_data_url'

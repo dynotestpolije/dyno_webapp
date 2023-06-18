@@ -1,7 +1,8 @@
 use crate::middlewares::JwtUserMiddleware;
 use crate::{actions::user as user_actions, models::user::NewUser};
 use actix_web::cookie::{self, Cookie};
-use actix_web::{get, post};
+use actix_web::http::header;
+use actix_web::{get, post, HttpRequest};
 use actix_web::{web, HttpResponse};
 use dyno_core::crypto::TokenDetails;
 use dyno_core::DynoResult;
@@ -45,6 +46,7 @@ pub async fn register_user(
 pub async fn login_user(
     web::Json(UserLogin { nim, password }): web::Json<UserLogin>,
     data: web::Data<crate::ServerState>,
+    req: HttpRequest,
 ) -> DynoResult<HttpResponse> {
     dyno_core::log::debug!("login endpoint post with nim: {nim}, pswd: {password}");
     let nim_borrowed = nim.clone();
@@ -76,6 +78,7 @@ pub async fn login_user(
         data.cfg.jwt.access_token_max_age,
         data.cfg.jwt.access_token_private_key.as_bytes(),
     )?;
+
     let refresh_token_details = TokenDetails::generate(
         user_session,
         data.cfg.jwt.refresh_token_max_age,
@@ -89,6 +92,7 @@ pub async fn login_user(
         ))
         .http_only(true)
         .finish();
+
     let refresh_cookie = Cookie::build("refresh_token", refresh_token_details.token.unwrap())
         .path("/")
         .max_age(cookie::time::Duration::minutes(
@@ -105,6 +109,12 @@ pub async fn login_user(
         .http_only(false)
         .finish();
 
+    if let Some(head) = req.headers().get(header::USER_AGENT) {
+        if head.to_str().is_ok_and(|x| x.contains("Dyno/Desktop")) {
+            data.change_active_user(user_session);
+        }
+    }
+
     dyno_core::DynoResult::Ok(
         HttpResponse::Ok()
             .cookie(access_cookie)
@@ -115,7 +125,11 @@ pub async fn login_user(
 }
 
 #[get("/auth/logout")]
-pub async fn logout_user(JwtUserMiddleware(_d): JwtUserMiddleware) -> HttpResponse {
+pub async fn logout_user(
+    JwtUserMiddleware(_d): JwtUserMiddleware,
+    data: web::Data<crate::ServerState>,
+    req: HttpRequest,
+) -> HttpResponse {
     let access_cookie = Cookie::build("access_token", "")
         .path("/")
         .max_age(RESET_AGE_DUR)
@@ -131,6 +145,12 @@ pub async fn logout_user(JwtUserMiddleware(_d): JwtUserMiddleware) -> HttpRespon
         .max_age(RESET_AGE_DUR)
         .http_only(true)
         .finish();
+
+    if let Some(head) = req.headers().get(header::USER_AGENT) {
+        if head.to_str().is_ok_and(|x| x.contains("Dyno/Desktop")) {
+            data.set_active(None);
+        }
+    }
     HttpResponse::Ok()
         .cookie(access_cookie)
         .cookie(refresh_cookie)

@@ -27,12 +27,23 @@ diesel::table! {
         user_id -> BigInt,
         info_id -> Nullable<BigInt>,
         uuid -> Text,
-        data_url -> Nullable<Text>,
+        data_url -> Text,
         data_checksum -> Text,
         verified -> Nullable<Bool>,
         start -> Timestamp,
         stop -> Timestamp,
         updated_at -> Timestamp,
+        created_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    histories (id) {
+        id -> BigInt,
+        user_id -> BigInt,
+        user_uuid -> Text,
+        dyno_id -> BigInt,
+        long_usage -> BigInt,
         created_at -> Timestamp,
     }
 }
@@ -52,4 +63,4 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(dyno_info, dynos, users,);
+diesel::allow_tables_to_appear_in_same_query!(dyno_info, dynos, histories, users,);

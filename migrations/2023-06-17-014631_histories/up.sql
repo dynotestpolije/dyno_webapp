@@ -1,0 +1,9 @@
+-- Your SQL goes here
+CREATE TABLE IF NOT EXISTS histories (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    user_uuid TEXT NOT NULL,
+    dyno_id INTEGER NOT NULL,
+    long_usage BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
