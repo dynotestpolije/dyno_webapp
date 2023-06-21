@@ -97,7 +97,7 @@ pub async fn add_dyno(
         let mut conn = dbpool.get().map_err(DynoErr::database_error)?;
         let dyno_config = DynoTestDataInfo::decompress(&info_stream).map_err(|err| {
             DynoErr::bad_request_error(format!(
-                "Multipart POST data is invalid, there no json config - {err}",
+                "Multipart POST data is invalid, there no info config - {err}",
             ))
         })?;
 

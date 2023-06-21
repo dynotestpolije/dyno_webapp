@@ -65,6 +65,7 @@ impl NewDynoInfo {
             berat_beban,
             gaya_beban,
             keliling_roller,
+            ..
         }: DynoConfig,
     ) -> Self {
         match motor_type {

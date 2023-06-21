@@ -24,6 +24,10 @@ mod db {
 use db::*;
 use models::ActiveUser;
 
+async fn index() -> actix_files::NamedFile {
+    actix_files::NamedFile::open("public/root/index.html").unwrap()
+}
+
 #[actix_web::main]
 async fn main() -> DynoResult<()> {
     init_logger()?;
@@ -47,7 +51,7 @@ async fn main() -> DynoResult<()> {
             "https"
         },
     );
-    let root_path = get_and_check_path(&app_state.cfg.app_public_path, "root");
+    let root_path = get_and_check_path(&app_state.cfg.app_public_path, "root/");
 
     let http_server = HttpServer::new(move || {
         App::new()
@@ -59,15 +63,14 @@ async fn main() -> DynoResult<()> {
                     .allowed_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
                     .max_age(3600),
             )
-            .wrap(Logger::default())
             .configure(handler::api)
-            // .service(web::redirect("/", "/index.html"))
             .service(
                 Files::new("/", root_path.clone())
                     .index_file("index.html")
-                    .show_files_listing()
                     .guard(guard::Get()),
             )
+            .default_service(web::get().to(index))
+            .wrap(Logger::default())
     });
     if let Some(tls) = tls_acceptor {
         http_server

@@ -1,4 +1,6 @@
 # ==========================================================================================#
+# menggunakan builder sebagai image builder dan menyalin hasil dari build pada image builder ke
+# image yang akan digunakan sebagai kontainer yang digunakan sebagai aplikasi
 FROM rust:latest as builder
 
 RUN rustup target add wasm32-unknown-unknown

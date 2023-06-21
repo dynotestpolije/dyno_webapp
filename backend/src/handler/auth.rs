@@ -173,7 +173,7 @@ pub async fn me(
     .map_err(DynoErr::internal_server_error)?;
 
     match user_response {
-        Ok(u) => Ok(HttpResponse::Ok().json(ApiResponse::success(u))),
+        Ok(u) => Ok(HttpResponse::Ok().json(ApiResponse::success(u.into_user_response()))),
         Err(err) => Err(err),
     }
 }
