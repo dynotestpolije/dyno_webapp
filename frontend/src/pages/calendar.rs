@@ -13,7 +13,7 @@ impl Component for PageCalendar {
 
     fn view(&self, _ctx: &yew::Context<Self>) -> yew::Html {
         html! {
-            <h1>{"SOP PAGES NOT IMPLEMENTED YET"}</h1>
+            <h1>{"CALENDAR PAGE NOT IMPLEMENTED YET"}</h1>
         }
     }
 }

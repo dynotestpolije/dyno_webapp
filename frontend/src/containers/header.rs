@@ -48,7 +48,7 @@ pub fn header(
             let notification = notification.clone();
 
             Box::pin(async move {
-                match logout().await {
+                match logout(state.token().unwrap()).await {
                     Ok(()) => {
                         state.delete_token();
                         if let Some(nav) = navigator {
@@ -104,11 +104,9 @@ pub fn header(
     }
 }
 
-async fn logout() -> DynoResult<()> {
-    let data = LocalStorage::get::<TokenDetails>(crate::USER_SESSION_OBJ_KEY).unwrap();
-    let token = format!("Bearer {}", data.token.unwrap_or_default());
+async fn logout(token: impl AsRef<str>) -> DynoResult<()> {
     match Request::get("/api/auth/logout")
-        .header("Authorization", &token)
+        .header("Authorization", token.as_ref())
         .send()
         .await
     {

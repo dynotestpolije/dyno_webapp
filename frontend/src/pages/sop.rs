@@ -13,7 +13,7 @@ impl Component for PageSop {
 
     fn view(&self, _ctx: &yew::Context<Self>) -> yew::Html {
         html! {
-            <h1>{"PAGE NOT IMPLEMENTED YET"}</h1>
+            <h1>{"SOP PAGE NOT IMPLEMENTED YET"}</h1>
         }
     }
 }

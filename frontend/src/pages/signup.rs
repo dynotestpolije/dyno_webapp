@@ -43,8 +43,6 @@ pub fn signup() -> Html {
 
     let error = use_state(AttrValue::default);
 
-    let class_loading = if *loading { "loading" } else { "" };
-
     let onupdate_nim = use_callback(
         create_cb!(validate_nim),
         (nim.clone(), validation_nim.clone()),
@@ -68,8 +66,8 @@ pub fn signup() -> Html {
         role.clone(),
     );
 
-    let navigator = use_navigator();
     let onsubmitsignup = {
+        let navigator = use_navigator();
         let loading = loading.setter();
         let error = error.setter();
         let data = UserRegistration {
@@ -79,28 +77,33 @@ pub fn signup() -> Html {
             confirm_password: nim.to_string(),
             role: *role,
         };
+        let validation_ok =
+            validation_nim.is_some() && validation_pswd.is_some() && validation_nim.is_some();
 
         use_callback(
             move |e: SubmitEvent, nav| {
                 e.prevent_default();
+                if validation_ok {
+                    let loading = loading.clone();
+                    let error = error.clone();
+                    let nav = nav.clone();
+                    let data = data.clone();
 
-                let loading = loading.clone();
-                let error = error.clone();
-                let nav = nav.clone();
-                let data = data.clone();
-
-                spawn_local(async move {
-                    loading.set(true);
-                    match signup_submit(data).await {
-                        Ok(_ok) => {
-                            if let Some(nav) = nav {
-                                nav.push(&Route::Dashboard)
+                    spawn_local(async move {
+                        loading.set(true);
+                        match signup_submit(data).await {
+                            Ok(_ok) => {
+                                if let Some(nav) = nav {
+                                    nav.push(&Route::Dashboard)
+                                }
                             }
+                            Err(err) => error.set(err.to_string().into()),
                         }
-                        Err(err) => error.set(err.to_string().into()),
-                    }
-                    loading.set(false);
-                })
+                        loading.set(false);
+                    })
+                } else {
+                    error.set("Input Error, Check your input again".into());
+                }
             },
             navigator,
         )
@@ -211,7 +214,14 @@ pub fn signup() -> Html {
             </div>
 
             <ErrorText class="mt-8" > {error.as_ref()} </ErrorText>
-            <button type="submit" class={classes!("btn", "mt-2", "w-full", "btn-primary", class_loading)}>{"Register"}</button>
+            <button
+                type="submit"
+                class={classes!("btn", "mt-2", "w-full", "btn-primary",
+                    if *loading { "loading loading-dots loading-sm" } else { "" }
+                )}
+            >
+                {"Register"}
+            </button>
 
             <div class="text-center mt-4">
                 {"Already have an account? "}

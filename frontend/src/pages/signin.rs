@@ -1,5 +1,6 @@
 use dyno_core::crypto::TokenDetails;
 use yew::prelude::*;
+use yew_router::prelude::use_navigator;
 use yewdux::prelude::Dispatch;
 
 use crate::components::{input::TextInput, landing_intro::LandingIntro, typography::ErrorText};
@@ -16,9 +17,8 @@ pub fn signin() -> yew::Html {
     let password = use_state(AttrValue::default);
     let error = use_state(AttrValue::default);
 
-    let class_loading = if *loading { "loading" } else { "" };
-
     let onsubmitlogin = {
+        let nav = use_navigator();
         let nim = nim.to_string();
         let password = password.to_string();
         let loading = loading.setter();
@@ -31,11 +31,17 @@ pub fn signin() -> yew::Html {
                 nim: nim.clone(),
                 password: password.clone(),
             };
+            let nav = nav.clone();
 
             Box::pin(async move {
                 loading.set(true);
                 match signin_submit(data).await {
-                    Ok(token) => state.change_token_details(token),
+                    Ok(token) => {
+                        state.change_token_details(token);
+                        if let Some(nav) = nav {
+                            nav.push(&Route::Dashboard);
+                        }
+                    }
                     Err(err) => error.set(err.to_string().into()),
                 }
                 loading.set(false);
@@ -88,7 +94,12 @@ pub fn signin() -> yew::Html {
         </div>
 
         <ErrorText class="mt-8" > {error.as_ref()} </ErrorText>
-        <button type="submit" class={classes!("btn", "mt-2", "w-full", "btn-primary", class_loading)}>{"Login"}</button>
+        <button type="submit"
+            class={classes!("btn", "mt-2", "w-full", "btn-primary",
+                if *loading { "loading loading-dots loading-sm" } else { "" })
+        }>
+            {"Login"}
+        </button>
 
         <div class="text-center mt-4">{"Don't have an account yet? "}
             <LinkTag to={Route::SignUp}>
