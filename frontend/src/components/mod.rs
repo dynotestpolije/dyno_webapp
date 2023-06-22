@@ -5,3 +5,4 @@ pub mod notification;
 pub mod typography;
 pub mod chart;
 pub mod button;
+pub mod stats;

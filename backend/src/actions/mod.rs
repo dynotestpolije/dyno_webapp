@@ -1,6 +1,7 @@
 pub mod dyno;
 pub mod info;
 pub mod user;
+pub mod history;
 
 macro_rules! query_one {
     (FIND $table:ident WHERE ($filter:expr) as $types:ty [$conn:expr]) => {{

@@ -24,7 +24,7 @@ pub fn TitleCard(props: &TitleCardProps) -> Html {
 
     html! {
     <div class={classes!("card", "w-full", "p-6", "bg-base-100", "shadow-xl", class_div.clone())}>
-        <Subtitle class={if top_side_button.is_some() { "inline-block" }else {"" }}>
+        <Subtitle class={if top_side_button.is_some() { "inline-block" } else {"" }}>
             {title}
             if let Some(top_btn) = top_side_button { <div className="inline-block float-right">{top_btn.clone()}</div> }
         </Subtitle>

@@ -2,28 +2,18 @@
 
 use dyno_core::{
     chrono::NaiveDateTime, crypto::TokenDetails, dynotests::DynoTest, serde, users::UserResponse,
-    uuid::Uuid, UserSession,
+    uuid::Uuid, DynoConfig, HistoryResponse, UserSession,
 };
 
 use crate::Theme;
-
-#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(crate = "serde")]
-pub struct Histories {
-    pub id: i64,
-    pub user_id: i64,
-    pub user_uuid: Uuid,
-    pub dyno_id: i64,
-    pub long_usage: i64,
-    pub created_at: NaiveDateTime,
-}
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(crate = "serde")]
 pub struct Data {
     dynos: Vec<DynoTest>,
     users: Vec<UserResponse>,
-    histories: Vec<Histories>,
+    infos: Vec<DynoConfig>,
+    histories: Vec<HistoryResponse>,
 }
 
 impl Data {
@@ -33,7 +23,10 @@ impl Data {
     pub fn set_users(&mut self, users: Vec<UserResponse>) {
         self.users = users;
     }
-    pub fn set_last_usage(&mut self, histories: Vec<Histories>) {
+    pub fn set_infos(&mut self, infos: Vec<DynoConfig>) {
+        self.infos = infos;
+    }
+    pub fn set_last_usage(&mut self, histories: Vec<HistoryResponse>) {
         self.histories = histories;
     }
 
@@ -43,11 +36,14 @@ impl Data {
     pub const fn users(&self) -> &Vec<UserResponse> {
         &self.users
     }
-    pub const fn histories(&self) -> &Vec<Histories> {
+    pub const fn histories(&self) -> &Vec<HistoryResponse> {
         &self.histories
     }
+    pub const fn infos(&self) -> &Vec<DynoConfig> {
+        &self.infos
+    }
 
-    pub fn last_usage(&self) -> Option<&Histories> {
+    pub fn last_usage(&self) -> Option<&HistoryResponse> {
         self.histories.last()
     }
 }
@@ -100,6 +96,9 @@ impl AppState {
 impl AppState {
     pub const fn get_data(&self) -> &Data {
         &self.data
+    }
+    pub fn get_data_mut(&mut self) -> &mut Data {
+        &mut self.data
     }
 }
 

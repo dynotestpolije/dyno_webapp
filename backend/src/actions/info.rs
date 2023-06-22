@@ -57,6 +57,17 @@ pub fn select_many(conn: &mut DynoDBPooledConnection, id: i64) -> DynoResult<Vec
 
 #[inline]
 #[allow(unused)]
+pub fn select_all(conn: &mut DynoDBPooledConnection) -> DynoResult<Vec<DynoInfo>> {
+    dsl::dyno_info
+        .select(DynoInfo::as_select())
+        .get_results::<DynoInfo>(conn)
+        .optional()
+        .map_err(DynoErr::database_error)?
+        .ok_or(DynoErr::database_error("Dynos record not exists in table"))
+}
+
+#[inline]
+#[allow(unused)]
 pub fn insert_many(conn: &mut DynoDBPooledConnection, new: Vec<NewDynoInfo>) -> DynoResult<usize> {
     diesel::insert_into(dsl::dyno_info)
         .values(new)

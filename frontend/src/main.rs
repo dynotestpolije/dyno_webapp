@@ -2,6 +2,7 @@
 
 mod components;
 mod containers;
+mod fetch;
 mod pages;
 mod route;
 mod state;
@@ -13,16 +14,18 @@ use yew_router::{prelude::use_route, BrowserRouter, Routable};
 use route::{LinkTag, Route};
 use yewdux::prelude::use_store;
 
-use crate::containers::suspend::SuspenseContent;
+use crate::{
+    components::notification::{Notification, NotificationFactory, NotificationsProvider},
+    containers::suspend::SuspenseContent,
+};
 use theme::Theme;
 
 use crate::{
     containers::layout::Layout,
     pages::{
         admin::{PageAdminDynos, PageAdminHistory, PageAdminInfos, PageAdminUsers},
-        setting::{PageSettingApps, PageSettingProfile},
-        PageAbout, PageActivities, PageCalendar, PageDashboard, PageNotFound, PageSignIn,
-        PageSignUp, PageSop,
+        PageActivities, PageDashboard, PageNotFound, PageSettingProfile, PageSignIn, PageSignUp,
+        PageSop,
     },
 };
 
@@ -51,12 +54,9 @@ fn router() -> Html {
                 Route::Dashboard => with_layout!(<PageDashboard/>),
                 Route::Activities => with_layout!(<PageActivities/>),
                 Route::Sop => with_layout!(<PageSop/>),
-                Route::Kalendar => with_layout!(<PageCalendar/>),
-                Route::About => with_layout!(<PageAbout/>),
                 Route::SignIn => html! { <PageSignIn /> },
                 Route::SignUp => html! { <PageSignUp /> },
                 Route::SettingProfile => with_layout!(<PageSettingProfile />),
-                Route::SettingApp => with_layout!(<PageSettingApps />),
                 Route::AdminDynos => with_layout!(<PageAdminDynos />),
                 Route::AdminUsers => with_layout!(<PageAdminUsers />),
                 Route::AdminInfos => with_layout!(<PageAdminInfos />),
@@ -75,7 +75,9 @@ fn app() -> Html {
     html! {
         <BrowserRouter >
             <Suspense fallback={html!(<SuspenseContent />)}>
+                <NotificationsProvider<Notification, NotificationFactory> component_creator={NotificationFactory}>
                     <DynoRouter />
+                </NotificationsProvider<Notification, NotificationFactory>>
             </Suspense>
         </BrowserRouter>
     }

@@ -12,10 +12,6 @@ pub enum Route {
     Activities,
     #[at("/sop")]
     Sop,
-    #[at("/about")]
-    About,
-    #[at("/calendar")]
-    Kalendar,
     #[at("/signin")]
     SignIn,
     #[at("/signup")]
@@ -23,8 +19,6 @@ pub enum Route {
 
     #[at("/settings/profile")]
     SettingProfile,
-    #[at("/settings/app")]
-    SettingApp,
 
     #[at("/administration/dynos")]
     AdminDynos,
@@ -73,29 +67,19 @@ thread_local! {
     pub static SIDE_BAR: std::cell::RefCell<Vec<RouteSideBar<'static>>>  = std::cell::RefCell::new(vec![
         route_sidebar!(HeroiconsOutlineSquares2X2, "Dashboard", Dashboard, User, "h-6 w-6"),
         route_sidebar!(HeroiconsOutlineChartBar, "Aktivitas", Activities, User, "h-6 w-6"),
-        route_sidebar!(HeroiconsOutlineDocumentText, "SOP", Sop, User, "h-6 w-6"),
+        route_sidebar!(HeroiconsOutlineUser, "Profil", SettingProfile, User, "h-5 w-5"),
         route_sidebar!(
             HeroiconsOutlineDocumentDuplicate,
             "Administration",
             Admin,
             [
-                route_sidebar!(HeroiconsOutlineUsers, "Users", AdminUsers, User, "h-5 w-5"),
-                route_sidebar!(HeroiconsOutlineTableCells, "Dynos", AdminDynos, User, "h-5 w-5"),
-                route_sidebar!(HeroiconsOutlineCog, "Infos", AdminInfos, User, "h-5 w-5"),
-                route_sidebar!(HeroiconsOutlineInboxStack, "History", AdminHistory, User, "h-5 w-5"),
+                route_sidebar!(HeroiconsOutlineUsers, "Users", AdminUsers, Admin, "h-5 w-5"),
+                route_sidebar!(HeroiconsOutlineTableCells, "Dynos", AdminDynos, Admin, "h-5 w-5"),
+                route_sidebar!(HeroiconsOutlineCog, "Infos", AdminInfos, Admin, "h-5 w-5"),
+                route_sidebar!(HeroiconsOutlineInboxStack, "History", AdminHistory, Admin, "h-5 w-5"),
             ]
         ),
-        route_sidebar!(
-            HeroiconsOutlineCog6Tooth,
-            "Settings",
-            User,
-            [
-                route_sidebar!(HeroiconsOutlineUser, "Profil", SettingProfile, User, "h-5 w-5"),
-                route_sidebar!(HeroiconsOutlineBolt, "App", SettingApp, User, "h-5 w-5")
-            ]
-        ),
-        route_sidebar!(HeroiconsOutlineCalendarDays, "Kalendar", Kalendar, User, "h-6 w-6"),
-        route_sidebar!(HeroiconsOutlineQuestionMarkCircle, "About", About, User, "h-6 w-6"),
+        route_sidebar!(HeroiconsOutlineDocumentText, "SOP", Sop, User, "h-6 w-6"),
     ]);
 }
 

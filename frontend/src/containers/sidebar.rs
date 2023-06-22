@@ -1,8 +1,9 @@
 use yew::prelude::*;
 use yew_icons::{Icon, IconId};
 use yew_router::{hooks::use_location, Routable};
+use yewdux::prelude::use_store;
 
-use crate::route::{sidebar_routes, LinkTag, Route, RouteSideBar};
+use crate::{route::{sidebar_routes, LinkTag, Route, RouteSideBar}, state::AppState};
 
 #[derive(Debug, Properties, PartialEq)]
 pub struct SideBarProps {
@@ -18,6 +19,8 @@ pub fn sidebar(props: &SideBarProps) -> Html {
         .unwrap_or_default();
 
     let callback = props.open_callback.clone();
+    let (state, _) = use_store::<AppState>();
+    let role = state.user().map(|x| x.role).unwrap_or_default();
 
     html! {
         <div class="drawer-side">
@@ -39,7 +42,7 @@ pub fn sidebar(props: &SideBarProps) -> Html {
                         {"Dynotests"}
                     </LinkTag>
                 </li>
-                {for sidebar_routes().borrow().iter().enumerate().map(|(idx, route)| {
+                {for sidebar_routes().borrow().iter().filter(|x| x.filter_role == role || role.is_admin()).enumerate().map(|(idx, route)| {
                     html!{
                     <li class="" key={idx}>
                         if let Some(ref submenu) = route.submenu {

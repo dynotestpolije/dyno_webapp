@@ -24,7 +24,7 @@ pub async fn register_user(
             .get()
             .map_err(DynoErr::database_error)
             .and_then(|mut conn| {
-                if !matches!(
+                if matches!(
                     user_actions::is_exists_by_nim(&mut conn, &user_registration.nim),
                     Ok(true)
                 ) {
@@ -49,20 +49,23 @@ pub async fn login_user(
     req: HttpRequest,
 ) -> DynoResult<HttpResponse> {
     dyno_core::log::debug!("login endpoint post with nim: {nim}, pswd: {password}");
+
+    let is_in_desktop = req
+        .headers()
+        .get(header::USER_AGENT)
+        .is_some_and(|x| x.to_str().is_ok_and(|x| x.contains("Dyno/Desktop")));
+
     let nim_borrowed = nim.clone();
     let db = data.db.clone();
-    let user = web::block(move || {
-        db.get()
-            .map_err(DynoErr::database_error)
-            .and_then(
-                |mut conn| match user_actions::find_by_nim(&mut conn, &nim_borrowed) {
-                    Ok(user) if verify_hash_password(&user.password, password) => Ok(user),
-                    Ok(_) => Err(DynoErr::unauthorized_error(
-                        "Auth Failed! User Password is not the same",
-                    )),
-                    Err(err) => Err(err),
-                },
-            )
+    let user = web::block(move || match db.get().map_err(DynoErr::database_error) {
+        Ok(mut conn) => match user_actions::find_by_nim(&mut conn, &nim_borrowed) {
+            Ok(user) if verify_hash_password(&user.password, password) => Ok(user),
+            Ok(_) => Err(DynoErr::unauthorized_error(
+                "Auth Failed! User Password is not the same",
+            )),
+            Err(err) => Err(err),
+        },
+        Err(err) => Err(err),
     })
     .await
     .map_err(DynoErr::internal_server_error)??;
@@ -109,10 +112,8 @@ pub async fn login_user(
         .http_only(false)
         .finish();
 
-    if let Some(head) = req.headers().get(header::USER_AGENT) {
-        if head.to_str().is_ok_and(|x| x.contains("Dyno/Desktop")) {
-            data.change_active_user(user_session);
-        }
+    if is_in_desktop {
+        data.change_active_user(user_session);
     }
 
     dyno_core::DynoResult::Ok(

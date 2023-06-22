@@ -2,7 +2,9 @@ use std::path::Path as StdPath;
 
 use actix_multipart::Multipart;
 use actix_web::{
-    get, post,
+    get,
+    http::header,
+    post,
     web::{self, Path},
     HttpResponse,
 };
@@ -155,11 +157,21 @@ pub async fn get_dyno(
         user_id,
         max,
         all,
+        admin,
     }): web::Query<DynoUrlsQueries>,
     JwtUserMiddleware(session): JwtUserMiddleware,
     data: web::Data<crate::ServerState>,
 ) -> DynoResult<HttpResponse> {
     let dbpool = data.db.clone();
+    let admin = if admin.is_some_and(|x| x) {
+        if session.role.is_admin() {
+            true
+        } else {
+            return Err(DynoErr::unauthorized_error("Admin Access is Required"));
+        }
+    } else {
+        false
+    };
 
     let user_id = user_id.unwrap_or(session.id);
     let blk_result = web::block(move || {
@@ -170,8 +182,13 @@ pub async fn get_dyno(
                 Some(id) => dyno_actions::select(&mut conn, id, user_id)
                     .map(|x| OneOrMany::One(Dynos::into_response(x))),
                 None => {
-                    if all {
-                        dyno_actions::select_many(&mut conn, user_id).map(|x| {
+                    if all.is_some_and(|x| x) || max.is_none() {
+                        if admin {
+                            dyno_actions::select_all(&mut conn)
+                        } else {
+                            dyno_actions::select_many(&mut conn, user_id)
+                        }
+                        .map(|x| {
                             OneOrMany::Many(
                                 x.into_iter().map(Dynos::into_response).collect::<Vec<_>>(),
                             )
@@ -209,7 +226,7 @@ pub async fn get_file_bin(
         .app_public_path
         .join("dyno")
         .join(user_uuid)
-        .join(file);
+        .join(&file);
 
     let result_block =
         web::block(move || std::fs::read(dyno_path).map_err(DynoErr::internal_server_error))
@@ -217,11 +234,12 @@ pub async fn get_file_bin(
             .map_err(DynoErr::internal_server_error)??;
 
     Ok(HttpResponse::Ok()
+        .append_header(header::ContentDisposition::attachment(file))
         .content_type("application/octet-stream")
         .body(result_block))
 }
 
-#[get("/dyno/{user_uuid}/{file}.xlsx")]
+#[get("/dyno/{user_uuid}/{file}/xlsx")]
 pub async fn get_file_excel(
     path: Path<(String, String)>,
     JwtUserMiddleware(_session): JwtUserMiddleware,
@@ -233,7 +251,7 @@ pub async fn get_file_excel(
         .app_public_path
         .join("dyno")
         .join(user_uuid)
-        .join(file);
+        .join(&file);
 
     let _filename_excel = dyno_path
         .with_extension("xlsx")
@@ -252,11 +270,15 @@ pub async fn get_file_excel(
     .map_err(DynoErr::internal_server_error)??;
 
     Ok(HttpResponse::Ok()
+        .append_header(header::ContentDisposition::attachment(format!(
+            "{}.xlsx",
+            file
+        )))
         .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         .body(result_block))
 }
 
-#[get("/dyno/{user_uuid}/{file}.csv")]
+#[get("/dyno/{user_uuid}/{file}/csv")]
 pub async fn get_file_csv(
     path: Path<(String, String)>,
     JwtUserMiddleware(_): JwtUserMiddleware,
@@ -268,12 +290,20 @@ pub async fn get_file_csv(
         .app_public_path
         .join("dyno")
         .join(user_uuid)
-        .join(file);
+        .join(&file);
 
     let result_block = web::block(move || {
         BufferData::decompress_from_path(dyno_path).and_then(|buffer| buffer.save_csv_into_bytes())
     })
     .await
     .map_err(DynoErr::internal_server_error)?;
-    result_block.map(|result| HttpResponse::Ok().content_type("text/csv").body(result))
+    result_block.map(|result| {
+        HttpResponse::Ok()
+            .append_header(header::ContentDisposition::attachment(format!(
+                "{}.csv",
+                file
+            )))
+            .content_type("text/csv")
+            .body(result)
+    })
 }

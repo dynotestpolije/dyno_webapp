@@ -1,8 +1,5 @@
-use dyno_core::{crypto::TokenDetails, DynoErr, DynoResult};
-use gloo::{
-    net::http::Request,
-    storage::{LocalStorage, Storage},
-};
+use dyno_core::{DynoErr, DynoResult};
+use gloo::net::http::Request;
 use web_sys::MouseEvent;
 use yew::{classes, function_component, html, AttrValue, Properties};
 use yew_icons::{Icon, IconId};
@@ -46,9 +43,9 @@ pub fn header(
             e.prevent_default();
             let navigator = navigator.clone();
             let notification = notification.clone();
-
+            let token = format!("Bearer {}", state.token().unwrap());
             Box::pin(async move {
-                match logout(state.token().unwrap()).await {
+                match logout(&token).await {
                     Ok(()) => {
                         state.delete_token();
                         if let Some(nav) = navigator {
@@ -60,6 +57,11 @@ pub fn header(
             })
         })
     };
+
+    let (name, nim) = state
+        .me()
+        .map(|x| (x.name.clone(), x.nim.clone()))
+        .unwrap_or_default();
 
     html! {
         <div class="navbar flex justify-between bg-base-100 z-10 shadow-md ">
@@ -89,6 +91,13 @@ pub fn header(
                     </label>
                     <ul tabIndex={0} class="menu menu-compact dropdown-content mt-3 p-2 shadow bg-base-100 rounded-box w-52">
                         <li class="justify-between">
+                            <a class="font-bold">{name}</a>
+                        </li>
+                        <li class="justify-between">
+                            <a class="font-light">{nim}</a>
+                        </li>
+                        <div class="divider mt-0 mb-0"></div>
+                        <li class="justify-between">
                             <LinkTag to={Route::SettingProfile}> {"Profile Settings"} <span class="badge">{"New"}</span> </LinkTag>
                         </li>
                         <div class="divider mt-0 mb-0"></div>
@@ -110,7 +119,7 @@ async fn logout(token: impl AsRef<str>) -> DynoResult<()> {
         .send()
         .await
     {
-        Ok(ok) if ok.ok() => Ok(()),
+        Ok(ok) if ok.ok() || ok.status() == 401 => Ok(()),
         Ok(ok) => Err(DynoErr::api_error(ok.text().await.unwrap_or_default())),
         Err(err) => Err(DynoErr::api_error(err)),
     }

@@ -15,9 +15,9 @@ pub struct InputTextAreaProps {
     pub update_callback: Callback<String>,
 }
 
-pub struct InputTextArea;
+pub struct TextInputArea;
 
-impl Component for InputTextArea {
+impl Component for TextInputArea {
     type Message = ();
     type Properties = InputTextAreaProps;
 

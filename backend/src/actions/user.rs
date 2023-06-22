@@ -92,10 +92,15 @@ pub fn insert_many(conn: &mut DynoDBPooledConnection, news: Vec<NewUser>) -> Dyn
 /// # Returns.
 /// this function will return number of rows that efected, not id the user.
 pub fn select_many(conn: &mut DynoDBPooledConnection, limit: Option<u32>) -> DynoResult<Vec<User>> {
-    let limit = limit.unwrap_or(5) as _;
-    dsl::users
-        .limit(limit)
-        .select(User::as_select())
-        .load(conn)
-        .map_err(DynoErr::database_error)
+    match limit {
+        Some(limit) => dsl::users
+            .limit(limit as _)
+            .select(User::as_select())
+            .load(conn)
+            .map_err(DynoErr::database_error),
+        None => dsl::users
+            .select(User::as_select())
+            .get_results(conn)
+            .map_err(DynoErr::database_error),
+    }
 }

@@ -78,7 +78,7 @@ pub fn signup() -> Html {
             role: *role,
         };
         let validation_ok =
-            validation_nim.is_some() && validation_pswd.is_some() && validation_nim.is_some();
+            validation_nim.is_none() && validation_pswd.is_none() && validation_nim.is_none();
 
         use_callback(
             move |e: SubmitEvent, nav| {
@@ -252,7 +252,7 @@ pub fn signup() -> Html {
 }
 
 async fn signup_submit(data: UserRegistration) -> DynoResult<usize> {
-    match Request::get("/api/auth/login")
+    match Request::post("/api/auth/register")
         .json(&data)
         .map_err(DynoErr::api_error)
     {

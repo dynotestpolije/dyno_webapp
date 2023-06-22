@@ -5,6 +5,8 @@ use crate::{actions, middlewares::JwtUserMiddleware, models::user::User};
 
 pub mod auth;
 pub mod dyno;
+pub mod history;
+pub mod info;
 pub mod user;
 
 #[inline]
@@ -23,6 +25,8 @@ pub fn api(conf: &mut ServiceConfig) {
             .service(user::delete_user)
             .service(dyno::get_dyno)
             .service(dyno::add_dyno)
+            .service(history::history)
+            .service(info::get_info)
             .service(get_active)
             .service(post_active)
             .service(post_non_active),
@@ -47,7 +51,17 @@ pub struct DynoUrlsQueries {
     pub id: Option<i64>,
     pub user_id: Option<i64>,
     pub max: Option<i64>,
-    pub all: bool,
+    pub all: Option<bool>,
+    pub admin: Option<bool>,
+}
+
+#[cfg_attr(debug_assert, derive(Debug))]
+#[derive(Clone, Default, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
+#[serde(crate = "dyno_core::serde")]
+pub struct DynoInfoQueries {
+    pub id: Option<i64>,
+    pub all: Option<bool>,
+    pub admin: Option<bool>,
 }
 
 #[actix_web::get("/health")]

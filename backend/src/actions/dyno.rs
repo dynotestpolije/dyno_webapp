@@ -81,6 +81,18 @@ pub fn select_many(conn: &mut DynoDBPooledConnection, user_id: i64) -> DynoResul
 
 #[inline]
 #[allow(unused)]
+pub fn select_all(conn: &mut DynoDBPooledConnection) -> DynoResult<Vec<Dynos>> {
+    use crate::schema::dynos;
+    dynos::table
+        .select(Dynos::as_select())
+        .get_results::<Dynos>(conn)
+        .optional()
+        .map_err(DynoErr::database_error)?
+        .ok_or(DynoErr::database_error("Dynos record not exists in table"))
+}
+
+#[inline]
+#[allow(unused)]
 pub fn select_many_limit(
     conn: &mut DynoDBPooledConnection,
     user_id: i64,

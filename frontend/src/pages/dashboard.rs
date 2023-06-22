@@ -1,100 +1,69 @@
-use dyno_core::{chrono::Utc, users::UserResponse, ActiveResponse, ApiResponse};
-use gloo::net::http::Request;
-use yew::{
-    classes, function_component, html, use_state, AttrValue, Classes, Html, Properties,
-    UseStateSetter,
-};
+use std::ops::Deref;
+
+use dyno_core::{chrono::Utc, ActiveResponse, DynoPlot};
+use yew::{function_component, html, use_effect_with_deps, use_state, Html, UseStateSetter};
 use yew_icons::{Icon, IconId};
 use yewdux::prelude::{use_store, Dispatch};
 
-use crate::{components::button::Button, state::AppState};
-
-pub async fn fetch_dashboard(
+use crate::{
+    components::{button::Button, chart::Chart, stats::Stats},
+    state::AppState,
+};
+pub async fn fetch_dashboard_all(
     state: &mut AppState,
-    token: impl AsRef<str>,
-    error: &UseStateSetter<String>,
+    active: UseStateSetter<Option<ActiveResponse>>,
+    history: UseStateSetter<DynoPlot>,
 ) {
-    let fetched = match Request::get("/api/auth/me")
-        .header("Authorization", token.as_ref())
-        .send()
-        .await
-    {
-        Ok(resp) if resp.status() == 200 => resp
-            .json::<ApiResponse<UserResponse>>()
-            .await
-            .map(|x| x.payload)
-            .ok(),
-        Err(err) => {
-            error.set(err.to_string());
-            None
-        }
-        _ => None,
-    };
-    state.set_me(fetched);
-}
+    let token = format!("Bearer {}", state.token().unwrap());
+    crate::fetch::fetch_status(&active, &token).await;
+    crate::fetch::fetch_dashboard(state, &token).await;
+    crate::fetch::fetch_dyno(state, &token).await;
 
-pub async fn fetch_status(
-    active: &UseStateSetter<Option<ActiveResponse>>,
-    token: impl AsRef<str>,
-    error: &UseStateSetter<String>,
-) {
-    let fetched_active = match Request::get("/api/active")
-        .header("Authorization", token.as_ref())
-        .send()
-        .await
-    {
-        Ok(resp) if resp.status() == 200 => resp
-            .json::<ApiResponse<ActiveResponse>>()
-            .await
-            .map(|x| x.payload)
-            .ok(),
-        Err(err) => {
-            error.set(err.to_string());
-            None
-        }
-        _ => None,
-    };
-    active.set(fetched_active)
+    history.set(DynoPlot::new().create_history_dyno(state.get_data().dyno()));
 }
 
 #[function_component(PageDashboard)]
 pub fn page_dashboard() -> Html {
+    let (state, _) = use_store::<AppState>();
+    let history_plot = use_state(DynoPlot::new);
     let active_user = use_state(|| Option::<ActiveResponse>::None);
-    let error = use_state(String::new);
 
     let on_refresh = {
         let active = active_user.setter();
-        let error = error.setter();
+        let history = history_plot.setter();
         Dispatch::<AppState>::new().reduce_mut_future_callback_with(move |s, _| {
             let active = active.clone();
-            let error = error.clone();
-            let token = format!("Bearer {}", s.token().unwrap());
-            Box::pin(async move {
-                fetch_status(&active, &token, &error).await;
-                fetch_dashboard(s, token, &error).await;
-            })
+            let history = history.clone();
+            Box::pin(fetch_dashboard_all(s, active, history))
         })
     };
+    {
+        let d = on_refresh.clone();
+        use_effect_with_deps(move |_| d.emit(()), ());
+    }
 
     let status_active = match active_user.as_ref() {
         Some(act) => html! {
-            <StatDashboard icon={IconId::HeroiconsOutlineUserCircle}
+            <Stats icon={IconId::HeroiconsOutlineUserCircle}
                 title="Active Dynotest"
                 value={match &act.user {
                     Some(user) => format!("{} ({})", user.name, user.nim),
                     None => "Not Logined".to_owned(),
                 }}
-                desc={format!("start: {} ({}m)", act.start.format("%r"), (act.start - Utc::now()).num_minutes())}
+                desc={format!("start: {} ({}m)", act.start.naive_local().format("%r"), (act.start - Utc::now()).num_minutes())}
             />
         },
         None => html! {
-            <StatDashboard icon={IconId::HeroiconsOutlineUserCircle}
+            <Stats icon={IconId::HeroiconsOutlineUserCircle}
                 title="Active Dynotest"
                 value="None"
                 desc="No active usage in Dynotest"
             />
         },
     };
+
+    let history_plot = history_plot.deref();
+
     html! {
     <>
         <div class="grid grid-cols-1 sm:grid-cols-1 gap-4">
@@ -115,53 +84,24 @@ pub fn page_dashboard() -> Html {
             </div>
         </div>
         <div class="grid lg:grid-cols-2 mt-1 md:grid-cols-1 grid-cols-1 gap-6">
-            <StatDashboard icon={IconId::HeroiconsOutlineAcademicCap} />
+            <Stats
+                icon={IconId::HeroiconsOutlineAcademicCap}
+                title="Total Dynotest Usage"
+                value={state.get_data().dyno().len().to_string()}
+                desc={
+                    let data = state.get_data().dyno();
+                    let verified_len = data.iter().filter(|x| x.verified).count();
+                    let len = data.len();
+                    format!("{} Verified {}/{} ({} %)",
+                        dyno_core::ternary!((verified_len < (len/2))? ("↙") : ("↗︎")),
+                        verified_len, len, (verified_len as f32 / len as f32) * 100.)
+                }
+            />
             {status_active}
         </div>
-    </>
-    }
-}
-
-#[derive(Properties, PartialEq, Clone)]
-pub struct StatDashboardProps {
-    icon: IconId,
-    #[prop_or(From::from("title"))]
-    title: AttrValue,
-    #[prop_or(From::from("value"))]
-    value: AttrValue,
-    #[prop_or(From::from("description"))]
-    desc: AttrValue,
-}
-
-pub fn get_desc_style(desc: &AttrValue) -> Classes {
-    if desc.contains("↗︎") {
-        From::from("font-bold text-green-700 dark:text-green-300")
-    } else if desc.contains('↙') {
-        From::from("font-bold text-rose-500 dark:text-red-400")
-    } else {
-        Default::default()
-    }
-}
-
-#[function_component(StatDashboard)]
-fn stat_dashboard(
-    StatDashboardProps {
-        icon,
-        title,
-        value,
-        desc,
-    }: &StatDashboardProps,
-) -> Html {
-    html! {
-        <div class="stats shadow">
-            <div class="stat">
-                <div class="stat-figure dark:text-slate-300 text-primary">
-                    <Icon icon_id={*icon} class="w-8 h-8" />
-                </div>
-                <div class="stat-title dark:text-slate-300">{title}</div>
-                <div class="stat-value dark:text-slate-300 text-primary">{value}</div>
-                <div class={classes!("stat-desc", get_desc_style(desc))}>{desc}</div>
-            </div>
+        <div class="grid lg:grid-cols-1 mt-1 md:grid-cols-1 grid-cols-1">
+            <Chart id="chart_activity" title="Chart Activities" plot={history_plot.clone()} />
         </div>
+    </>
     }
 }

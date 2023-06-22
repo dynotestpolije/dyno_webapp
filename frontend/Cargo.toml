@@ -25,4 +25,4 @@ features = [
 
 [dependencies.dyno_core]
 workspace = true
-features = ["use_wasm", "use_excel"]
+features = ["use_wasm", "use_excel", "use_plot"]
