@@ -11,7 +11,7 @@ use crate::{components::cards::TitleCard, state::AppState};
 pub fn page_admin_user() -> Html {
     let idx_open = use_state(|| Option::<usize>::None);
     let (state, dispatch) = use_store::<AppState>();
-    let token = format!("Bearer {}", state.token().unwrap());
+    let token = format!("Bearer {}", state.token_session().unwrap());
     let on_refresh = {
         let token = token.clone();
         dispatch.reduce_mut_future_callback_with(move |s, _| {
@@ -41,7 +41,6 @@ pub fn page_admin_user() -> Html {
                 html! {
                     <tr key={d.id}>
                         <td>{d.id}</td>
-                        <td>{d.uuid.to_string()}</td>
                         <td>{d.nim}</td>
                         <td>{d.name}</td>
                         <td>{d.email}</td>
@@ -75,7 +74,6 @@ pub fn page_admin_user() -> Html {
                     <thead>
                     <tr>
                         <th>{"Id"}</th>
-                        <th>{"Uuid"}</th>
                         <th>{"NIM"}</th>
                         <th>{"Nama"}</th>
                         <th>{"Email"}</th>

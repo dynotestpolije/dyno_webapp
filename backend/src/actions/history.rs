@@ -43,10 +43,29 @@ pub fn insert(conn: &mut DynoDBPooledConnection, new: NewHistory) -> DynoResult<
 
 #[inline]
 #[allow(unused)]
-pub fn select_many(conn: &mut DynoDBPooledConnection, id: i64) -> DynoResult<Vec<History>> {
+pub fn select_many(
+    conn: &mut DynoDBPooledConnection,
+    id: i64,
+    limit: Option<i64>,
+) -> DynoResult<Vec<History>> {
+    let mut query = dsl::histories
+        .select(History::as_select())
+        .filter(dsl::user_id.eq(id));
+    if let Some(limit) = limit {
+        let query = query.limit(limit);
+    }
+    query
+        .get_results(conn)
+        .optional()
+        .map_err(DynoErr::database_error)?
+        .ok_or(DynoErr::database_error("Dynos record not exists in table"))
+}
+
+#[inline]
+#[allow(unused)]
+pub fn select_all(conn: &mut DynoDBPooledConnection) -> DynoResult<Vec<History>> {
     dsl::histories
         .select(History::as_select())
-        .filter(dsl::user_id.eq(id))
         .get_results(conn)
         .optional()
         .map_err(DynoErr::database_error)?

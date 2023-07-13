@@ -1,5 +1,5 @@
-use dyno_core::serde;
-#[repr(u32)]
+use dyno_core::{serde, PlotColor};
+#[repr(u8)]
 #[derive(
     Debug,
     Default,
@@ -48,5 +48,13 @@ impl Theme {
     #[inline]
     pub fn is_light(self) -> bool {
         matches!(self, Self::Light)
+    }
+
+    #[inline]
+    pub const fn plot_color(self) -> PlotColor {
+        match self {
+            Theme::Dark => PlotColor::dark(),
+            Theme::Light => PlotColor::light(),
+        }
     }
 }

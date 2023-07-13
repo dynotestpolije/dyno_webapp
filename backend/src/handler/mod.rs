@@ -8,6 +8,7 @@ pub mod dyno;
 pub mod history;
 pub mod info;
 pub mod user;
+pub mod ws;
 
 #[inline]
 pub fn api(conf: &mut ServiceConfig) {
@@ -31,9 +32,8 @@ pub fn api(conf: &mut ServiceConfig) {
             .service(post_active)
             .service(post_non_active),
     )
-    .service(dyno::get_file_bin)
-    .service(dyno::get_file_excel)
-    .service(dyno::get_file_csv);
+    .service(ws::websocket_endpoint)
+    .service(dyno::get_file);
 }
 
 #[cfg_attr(debug_assert, derive(Debug))]
@@ -49,17 +49,7 @@ pub struct UserUrlsQueries {
 #[serde(crate = "dyno_core::serde")]
 pub struct DynoUrlsQueries {
     pub id: Option<i64>,
-    pub user_id: Option<i64>,
     pub max: Option<i64>,
-    pub all: Option<bool>,
-    pub admin: Option<bool>,
-}
-
-#[cfg_attr(debug_assert, derive(Debug))]
-#[derive(Clone, Default, dyno_core::serde::Deserialize, dyno_core::serde::Serialize)]
-#[serde(crate = "dyno_core::serde")]
-pub struct DynoInfoQueries {
-    pub id: Option<i64>,
     pub all: Option<bool>,
     pub admin: Option<bool>,
 }

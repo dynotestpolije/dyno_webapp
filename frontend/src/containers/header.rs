@@ -1,7 +1,7 @@
 use dyno_core::{DynoErr, DynoResult};
 use gloo::net::http::Request;
 use web_sys::MouseEvent;
-use yew::{classes, function_component, html, AttrValue, Properties};
+use yew::{classes, function_component, html, use_effect_with_deps, AttrValue, Properties};
 use yew_icons::{Icon, IconId};
 use yew_router::prelude::use_navigator;
 use yewdux::prelude::use_store;
@@ -30,6 +30,18 @@ pub fn header(
 ) -> yew::Html {
     let (state, dispatech) = use_store::<AppState>();
     let theme = state.theme();
+    {
+        use_effect_with_deps(
+            move |d| match gloo::utils::document_element()
+                .set_attribute("data-theme", d.to_str())
+                .map_err(|j| j.as_string().unwrap_or(String::new()))
+            {
+                Ok(()) => (),
+                Err(err) => dyno_core::log::error!("Failed to set `data-theme`: {err}"),
+            },
+            theme,
+        )
+    }
 
     let onchange_theme = dispatech.reduce_mut_callback_with(move |state, e: MouseEvent| {
         e.prevent_default();
@@ -43,7 +55,7 @@ pub fn header(
             e.prevent_default();
             let navigator = navigator.clone();
             let notification = notification.clone();
-            let token = format!("Bearer {}", state.token().unwrap());
+            let token = format!("Bearer {}", state.token_session().unwrap());
             Box::pin(async move {
                 match logout(&token).await {
                     Ok(()) => {
@@ -98,7 +110,7 @@ pub fn header(
                         </li>
                         <div class="divider mt-0 mb-0"></div>
                         <li class="justify-between">
-                            <LinkTag to={Route::SettingProfile}> {"Profile Settings"} <span class="badge">{"New"}</span> </LinkTag>
+                            <LinkTag to={Route::SettingProfile}> {"Profile Settings"}</LinkTag>
                         </li>
                         <div class="divider mt-0 mb-0"></div>
                         <li>

@@ -1,3 +1,4 @@
+use dyno_core::chrono::{Local, TimeZone};
 use yew::{function_component, html, Html};
 use yewdux::prelude::use_store;
 
@@ -6,7 +7,7 @@ use crate::{components::cards::TitleCard, state::AppState};
 #[function_component(PageAdminHistory)]
 pub fn page_admin_history() -> Html {
     let (state, dispatch) = use_store::<AppState>();
-    let token = format!("Bearer {}", state.token().unwrap());
+    let token = format!("Bearer {}", state.token_session().unwrap());
     let on_refresh = {
         dispatch.reduce_mut_future_callback_with(move |s, _| {
             let token = token.clone();
@@ -22,13 +23,14 @@ pub fn page_admin_history() -> Html {
             .into_iter()
             .enumerate()
             .map(|(k, d)| {
+                let created_at = Local
+                    .from_utc_datetime(&d.created_at)
+                    .format("%r %v")
+                    .to_string();
                 html! {
                     <tr key={k}>
                         <td>{d.user_id}</td>
-                        <td>{d.user_uuid.to_string()}</td>
-                        <td>{d.dyno_id}</td>
-                        <td>{d.long_usage}</td>
-                        <td>{d.created_at.format("%r %v").to_string()}</td>
+                        <td>{created_at}</td>
                     </tr>
                 }
             })
@@ -44,9 +46,6 @@ pub fn page_admin_history() -> Html {
                     <thead>
                     <tr>
                         <th>{"User Id"}</th>
-                        <th>{"User Uuid"}</th>
-                        <th>{"Dyno Id"}</th>
-                        <th>{"Long Usage"}</th>
                         <th>{"Created at"}</th>
                     </tr>
                     </thead>

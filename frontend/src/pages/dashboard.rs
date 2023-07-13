@@ -7,6 +7,8 @@ use yewdux::prelude::{use_store, Dispatch};
 
 use crate::{
     components::{button::Button, chart::Chart, stats::Stats},
+    fetch,
+    route::{LinkTag, Route},
     state::AppState,
 };
 pub async fn fetch_dashboard_all(
@@ -14,12 +16,15 @@ pub async fn fetch_dashboard_all(
     active: UseStateSetter<Option<ActiveResponse>>,
     history: UseStateSetter<DynoPlot>,
 ) {
-    let token = format!("Bearer {}", state.token().unwrap());
-    crate::fetch::fetch_status(&active, &token).await;
-    crate::fetch::fetch_dashboard(state, &token).await;
-    crate::fetch::fetch_dyno(state, &token).await;
+    let token = format!("Bearer {}", state.token_session().unwrap());
+    fetch::fetch_status(&active, &token).await;
+    fetch::fetch_dashboard(state, &token).await;
+    fetch::fetch_dyno(state, &token).await;
 
-    history.set(DynoPlot::new().create_history_dyno(state.get_data().dyno()));
+    let plot = DynoPlot::new()
+        .set_color(state.theme().plot_color())
+        .create_history_dyno(state.get_data().dyno());
+    history.set(plot);
 }
 
 #[function_component(PageDashboard)]
@@ -39,7 +44,13 @@ pub fn page_dashboard() -> Html {
     };
     {
         let d = on_refresh.clone();
-        use_effect_with_deps(move |_| d.emit(()), ());
+        use_effect_with_deps(
+            move |_| {
+                d.emit(());
+                || ()
+            },
+            state.theme(),
+        );
     }
 
     let status_active = match active_user.as_ref() {
@@ -68,6 +79,14 @@ pub fn page_dashboard() -> Html {
     <>
         <div class="grid grid-cols-1 sm:grid-cols-1 gap-4">
             <div class="text-right ">
+                if active_user.is_some() {
+                    <LinkTag to={Route::Live}>
+                        <Button class="btn-ghost normal-case">
+                            <Icon icon_id={IconId::HeroiconsOutlineWifi} class="w-4 mr-2"/>
+                            {"Stream Data"}
+                        </Button>
+                    </LinkTag>
+                }
                 <Button class="btn-ghost normal-case" onclick={on_refresh}>
                     <Icon icon_id={IconId::HeroiconsOutlineArrowPath} class="w-4 mr-2"/>
                     {"Refresh Data"}

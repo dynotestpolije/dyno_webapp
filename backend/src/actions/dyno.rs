@@ -41,6 +41,18 @@ pub fn select(conn: &mut DynoDBPooledConnection, id: i64, user_id: i64) -> DynoR
         .map_err(DynoErr::database_error)?
         .ok_or(DynoErr::database_error("Dynos record not exists in table"))
 }
+#[inline]
+#[allow(unused)]
+pub fn select_by_id(conn: &mut DynoDBPooledConnection, id: i64) -> DynoResult<Dynos> {
+    use crate::schema::dynos;
+    dynos::table
+        .filter(dynos::dsl::id.eq(id))
+        .select(Dynos::as_select())
+        .get_result(conn)
+        .optional()
+        .map_err(DynoErr::database_error)?
+        .ok_or(DynoErr::database_error("Dynos record not exists in table"))
+}
 
 #[inline]
 #[allow(unused)]

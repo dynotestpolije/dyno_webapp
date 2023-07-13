@@ -37,7 +37,7 @@ pub fn signin() -> yew::Html {
                 loading.set(true);
                 match signin_submit(data).await {
                     Ok(token) => {
-                        state.change_token_details(token);
+                        state.set_token_details(token);
                         if let Some(nav) = nav {
                             nav.push(&Route::Dashboard);
                         }
@@ -96,7 +96,7 @@ pub fn signin() -> yew::Html {
         <ErrorText class="mt-8" > {error.as_ref()} </ErrorText>
         <button type="submit"
             class={classes!("btn", "mt-2", "w-full", "btn-primary",
-                if *loading { "loading loading-dots loading-sm" } else { "" })
+                if *loading { "loading-dots loading-sm" } else { "" })
         }>
             {"Login"}
         </button>

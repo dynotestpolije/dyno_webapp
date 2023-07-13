@@ -1,16 +1,26 @@
 use actix_web::{get, web, HttpResponse, Responder};
 use dyno_core::{users::OneOrMany, ApiResponse, DynoErr};
 
-use crate::{actions, middlewares::JwtUserMiddleware};
-
-use super::DynoInfoQueries;
+use crate::{actions, handler::DynoUrlsQueries, middlewares::JwtUserMiddleware};
 
 #[get("/info")]
 pub async fn get_info(
-    web::Query(DynoInfoQueries { id, all, admin }): web::Query<DynoInfoQueries>,
+    web::Query(DynoUrlsQueries {
+        id,
+        all,
+        max: _,
+        admin,
+    }): web::Query<DynoUrlsQueries>,
     JwtUserMiddleware(session): JwtUserMiddleware,
     data: web::Data<crate::ServerState>,
 ) -> impl Responder {
+    let is_admin = session.role.is_admin();
+    let admin_query = admin.is_some_and(|x| x);
+    if admin.is_some_and(|x| x) && !is_admin {
+        return Err(DynoErr::unauthorized_error(
+            "NotAuthorized! Admin Access required!",
+        ));
+    }
     let ret = web::block(move || {
         data.db
             .get()
@@ -20,7 +30,7 @@ pub async fn get_info(
                     actions::info::select(&mut conn, id).map(|x| OneOrMany::One(x.into_response()))
                 }
                 None => {
-                    if all.is_some_and(|x| x) && admin.is_some_and(|x| x) {
+                    if all.is_some_and(|x| x) && is_admin && admin_query {
                         actions::info::select_all(&mut conn).map(|x| {
                             OneOrMany::Many(x.into_iter().map(|d| d.into_response()).collect())
                         })

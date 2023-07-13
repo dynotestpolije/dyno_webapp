@@ -7,7 +7,7 @@ use crate::{components::cards::TitleCard, state::AppState};
 #[function_component(PageAdminInfos)]
 pub fn page_admin_infos() -> Html {
     let (state, dispatch) = use_store::<AppState>();
-    let token = format!("Bearer {}", state.token().unwrap());
+    let token = format!("Bearer {}", state.token_session().unwrap());
     let on_refresh = {
         dispatch.reduce_mut_future_callback_with(move |s, _| {
             let token = token.clone();
@@ -26,11 +26,11 @@ pub fn page_admin_infos() -> Html {
                 html! {
                     <tr key={k}>
                         <td>{k+1}</td>
-                        <td>{d.motor_type.name()}</td>
-                        if let MotorType::Engine(info) = &d.motor_type {
-                            <td>{info.cc.to_string()}</td>
-                            <td>{info.cylinder.to_string()}</td>
-                            <td>{info.stroke.to_string()}</td>
+                        <td>{d.motor_info.name.clone()}</td>
+                        if let MotorType::Engine = &d.motor_type {
+                            <td>{d.motor_info.cc.to_string()}</td>
+                            <td>{d.motor_info.cylinder.to_string()}</td>
+                            <td>{d.motor_info.stroke.to_string()}</td>
                         }
                     </tr>
                 }

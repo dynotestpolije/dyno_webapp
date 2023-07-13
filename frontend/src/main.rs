@@ -8,6 +8,7 @@ mod route;
 mod state;
 mod theme;
 
+use wasm_bindgen::UnwrapThrowExt;
 use yew::{function_component, html, Html, Suspense};
 use yew_router::{prelude::use_route, BrowserRouter, Routable};
 
@@ -17,6 +18,7 @@ use yewdux::prelude::use_store;
 use crate::{
     components::notification::{Notification, NotificationFactory, NotificationsProvider},
     containers::suspend::SuspenseContent,
+    pages::PageLive,
 };
 use theme::Theme;
 
@@ -36,7 +38,7 @@ macro_rules! with_layout {
 #[function_component(DynoRouter)]
 fn router() -> Html {
     let (state, _) = use_store::<state::AppState>();
-    let route = use_route::<Route>().map(|p| match state.token().is_none() {
+    let route = use_route::<Route>().map(|p| match state.token_session().is_none() {
         true => {
             if matches!(p, Route::SignIn | Route::SignUp) {
                 p
@@ -56,6 +58,7 @@ fn router() -> Html {
                 Route::Sop => with_layout!(<PageSop/>),
                 Route::SignIn => html! { <PageSignIn /> },
                 Route::SignUp => html! { <PageSignUp /> },
+                Route::Live => with_layout!(<PageLive />),
                 Route::SettingProfile => with_layout!(<PageSettingProfile />),
                 Route::AdminDynos => with_layout!(<PageAdminDynos />),
                 Route::AdminUsers => with_layout!(<PageAdminUsers />),
@@ -74,20 +77,24 @@ fn router() -> Html {
 fn app() -> Html {
     html! {
         <BrowserRouter >
-            <Suspense fallback={html!(<SuspenseContent />)}>
-                <NotificationsProvider<Notification, NotificationFactory> component_creator={NotificationFactory}>
+            <NotificationsProvider<Notification, NotificationFactory> component_creator={NotificationFactory}>
+                <Suspense fallback={html!(<SuspenseContent />)}>
                     <DynoRouter />
-                </NotificationsProvider<Notification, NotificationFactory>>
-            </Suspense>
+                </Suspense>
+            </NotificationsProvider<Notification, NotificationFactory>>
         </BrowserRouter>
     }
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
-    wasm_logger::init(wasm_logger::Config::new(dyno_core::log::Level::Debug));
-    #[cfg(not(debug_assertions))]
-    wasm_logger::init(wasm_logger::Config::new(dyno_core::log::Level::Warn));
-
+    wasm_logger::init(wasm_logger::Config::new(dyno_core::log::Level::Info));
     yew::Renderer::<App>::new().render();
+}
+
+#[inline]
+fn get_host() -> String {
+    gloo::utils::window()
+        .location()
+        .host()
+        .expect_throw("this is should not be happen")
 }

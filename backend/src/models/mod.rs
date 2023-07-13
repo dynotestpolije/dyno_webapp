@@ -32,15 +32,9 @@ impl ActiveUser {
             start: Utc::now(),
         }
     }
-    pub fn to_history(&self, dyno_id: i64) -> Option<history::NewHistory> {
-        let now = Utc::now();
+    pub fn to_history(&self) -> Option<history::NewHistory> {
         let Some(user) = self.user else { return None; };
-        Some(history::NewHistory::new(
-            user.id,
-            user.uuid,
-            dyno_id,
-            (now - self.start).num_seconds(),
-        ))
+        Some(history::NewHistory::new(user.id))
     }
     pub fn set_user(mut self, user: UserSession) -> Self {
         self.user = Some(user);

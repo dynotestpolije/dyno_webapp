@@ -1,9 +1,6 @@
 use crate::schema::dyno_info;
 use dyno_core::chrono::NaiveDateTime;
-use dyno_core::model::dynotests::MotorTy;
-use dyno_core::{
-    serde, Cylinder, DynoConfig, ElectricMotor, InfoMotor, MotorType, Numeric, Stroke,
-};
+use dyno_core::{serde, Cylinder, DynoConfig, MotorType, Numeric, Stroke};
 
 #[cfg_attr(debug_assertions, derive(Debug))]
 #[derive(
@@ -38,20 +35,8 @@ pub struct DynoInfo {
 impl DynoInfo {
     #[inline]
     pub fn into_response(self) -> DynoConfig {
-        let motortype = MotorTy::from(self.motor_type);
         DynoConfig {
-            motor_type: match motortype {
-                MotorTy::Electric => MotorType::Electric(ElectricMotor {
-                    name: self.name.unwrap_or_default(),
-                }),
-                MotorTy::Engine => MotorType::Engine(InfoMotor {
-                    name: self.name.unwrap_or_default(),
-                    cc: self.cc.unwrap_or_default() as _,
-                    cylinder: Cylinder::from(self.cylinder.unwrap_or_default() as u8),
-                    stroke: Stroke::from(self.stroke.unwrap_or_default() as u8),
-                    transmition: Default::default(),
-                }),
-            },
+            motor_type: MotorType::from(self.motor_type as u8),
             diameter_roller: self.diameter_roller.unwrap_or_default().into(),
             diameter_roller_beban: self.diameter_roller_beban.unwrap_or_default().into(),
             diameter_gear_encoder: self.diameter_gear_encoder.unwrap_or_default().into(),
@@ -60,7 +45,14 @@ impl DynoInfo {
             berat_beban: self.berat_beban.unwrap_or_default().into(),
             gaya_beban: self.gaya_beban.unwrap_or_default().into(),
             keliling_roller: self.keliling_roller.unwrap_or_default().into(),
-            filter_rpm_engine: Default::default(),
+            motor_info: dyno_core::MotorInfo {
+                name: self.name.unwrap_or_default(),
+                cc: self.cc.unwrap_or_default() as _,
+                cylinder: Cylinder::from(self.cc.unwrap_or_default() as u8),
+                stroke: Stroke::from(self.stroke.unwrap_or_default() as u8),
+                transmition: Default::default(),
+            },
+            ..Default::default()
         }
     }
 }
@@ -97,13 +89,14 @@ impl NewDynoInfo {
             berat_beban,
             gaya_beban,
             keliling_roller,
+            motor_info,
             ..
         }: DynoConfig,
     ) -> Self {
         match motor_type {
-            MotorType::Electric(ElectricMotor { name }) => Self {
-                motor_type: MotorTy::Electric as i16,
-                name: Some(name),
+            MotorType::Electric => Self {
+                motor_type: MotorType::Electric as i16,
+                name: Some(motor_info.name),
                 diameter_roller: Some(diameter_roller.to_f32()),
                 diameter_roller_beban: Some(diameter_roller_beban.to_f32()),
                 diameter_gear_encoder: Some(diameter_gear_encoder.to_f32()),
@@ -114,15 +107,9 @@ impl NewDynoInfo {
                 keliling_roller: Some(keliling_roller.to_f32()),
                 ..Default::default()
             },
-            MotorType::Engine(InfoMotor {
-                name,
-                cc,
-                cylinder,
-                stroke,
-                ..
-            }) => Self {
-                motor_type: MotorTy::Engine as _,
-                name: Some(name),
+            MotorType::Engine => Self {
+                motor_type: MotorType::Engine as _,
+                name: Some(motor_info.name),
                 diameter_roller: Some(diameter_roller.to_f32()),
                 diameter_roller_beban: Some(diameter_roller_beban.to_f32()),
                 diameter_gear_encoder: Some(diameter_gear_encoder.to_f32()),
@@ -131,9 +118,9 @@ impl NewDynoInfo {
                 berat_beban: Some(berat_beban.to_f32()),
                 gaya_beban: Some(gaya_beban.to_f32()),
                 keliling_roller: Some(keliling_roller.to_f32()),
-                cc: Some(cc as _),
-                cylinder: Some(cylinder as _),
-                stroke: Some(stroke as _),
+                cc: Some(motor_info.cc as _),
+                cylinder: Some(motor_info.cylinder as _),
+                stroke: Some(motor_info.stroke as _),
             },
         }
     }

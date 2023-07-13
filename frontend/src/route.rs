@@ -17,6 +17,9 @@ pub enum Route {
     #[at("/signup")]
     SignUp,
 
+    #[at("/live")]
+    Live,
+
     #[at("/settings/profile")]
     SettingProfile,
 

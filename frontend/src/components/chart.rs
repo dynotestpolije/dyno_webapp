@@ -1,5 +1,5 @@
 use dyno_core::DynoPlot;
-use yew::{function_component, html, platform::spawn_local, AttrValue, Children, Html, Properties};
+use yew::{function_component, html, AttrValue, Children, Html, Properties};
 
 use crate::components::cards::TitleCard;
 
@@ -16,17 +16,25 @@ pub struct ChartProps {
 
 #[function_component(Chart)]
 pub fn chart(props: &ChartProps) -> Html {
+    let p = {
+        let id = props.id.clone();
+        let plot = props.plot.clone();
+        yew_hooks::use_async::<_, _, ()>(async move {
+            plot.render_to_canvas(id).await;
+            Ok(())
+        })
+    };
     yew::use_effect_with_deps(
-        move |d| {
-            let d = d.clone();
-            spawn_local(async move { d.1.render_to_canvas(d.0).await })
+        move |_| {
+            p.run();
+            || ()
         },
-        (props.id.to_string(), props.plot.clone()),
+        props.plot.clone(),
     );
     html! {
-    <TitleCard title={props.title.clone()} top_side_button={props.top_side_button.clone()}>
-      <div id={props.id.clone()}></div>
-      {props.children.clone()}
-    </TitleCard>
+        <TitleCard title={props.title.clone()} top_side_button={props.top_side_button.clone()}>
+            <div id={props.id.clone()}></div>
+            {props.children.clone()}
+        </TitleCard>
     }
 }

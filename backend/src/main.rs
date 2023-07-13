@@ -6,12 +6,16 @@ mod models;
 mod schema;
 mod seeder;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashSet,
+    sync::{atomic::AtomicBool, Arc, Mutex},
+};
 
+use actix::Addr;
 use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{self, guard, http::header, middleware::Logger, web, App, HttpServer};
-use dyno_core::{log, DynoConfig, DynoErr, DynoResult, UserSession};
+use dyno_core::{crossbeam_channel::Sender, log, DynoConfig, DynoErr, DynoResult, UserSession};
 
 // TODO: should i implement other databases?
 #[cfg(feature = "db_sqlite")]
@@ -22,7 +26,10 @@ mod db {
     pub type DynoDBPooledConnection = diesel::r2d2::PooledConnection<DynoDBConnManager>;
 }
 use db::*;
+use handler::ws::WsConn;
 use models::ActiveUser;
+
+use crate::handler::ws::WsMessage;
 
 async fn index() -> actix_files::NamedFile {
     actix_files::NamedFile::open("public/root/index.html").unwrap()
@@ -30,9 +37,12 @@ async fn index() -> actix_files::NamedFile {
 
 #[actix_web::main]
 async fn main() -> DynoResult<()> {
-    init_logger()?;
+    let start = Arc::new(AtomicBool::new(true));
 
-    let app_state = server_init()?;
+    init_logger()?;
+    let (tx, rx) = dyno_core::crossbeam_channel::unbounded();
+
+    let app_state = server_init(tx)?;
     log::debug!("Server State is initiaize.. configuring Server..");
 
     let tls_acceptor = match app_state.cfg.tls_path() {
@@ -51,6 +61,38 @@ async fn main() -> DynoResult<()> {
             "https"
         },
     );
+
+    let start_ws = start.clone();
+    actix_web::rt::task::spawn_blocking(move || {
+        log::info!("Running spawn actix runtime for websocket clients handler");
+        let mut clients = HashSet::<Addr<WsConn>>::new();
+        loop {
+            if !start_ws.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
+            if let Ok(msg) = rx.recv() {
+                match msg {
+                    WsMessage::Disconn(addr) => {
+                        log::info!("[MSG] websocket: {addr:?}");
+                        clients.remove(&addr);
+                    }
+                    WsMessage::Conn(addr) => {
+                        log::info!("[MSG] websocket: {addr:?}");
+                        clients.insert(addr);
+                    }
+                    WsMessage::Msg(msg) => {
+                        log::info!("[MSG] websocket: OnMessage");
+                        for client in &clients {
+                            let msg = msg.clone();
+                            client.do_send(msg);
+                        }
+                    }
+                }
+            }
+        }
+        log::info!("Stop spawn actix runtime for websocket clients handler");
+    });
+
     let root_path = get_and_check_path(&app_state.cfg.app_public_path, "root/");
 
     let http_server = HttpServer::new(move || {
@@ -72,7 +114,8 @@ async fn main() -> DynoResult<()> {
             .default_service(web::get().to(index))
             .wrap(Logger::default())
     });
-    if let Some(tls) = tls_acceptor {
+    log::info!("Running spawn actix runtime main server");
+    let resp = if let Some(tls) = tls_acceptor {
         http_server
             .bind_openssl((host.as_str(), port), tls)?
             .run()
@@ -84,21 +127,21 @@ async fn main() -> DynoResult<()> {
             .run()
             .await
             .map_err(From::from)
-    }
+    };
+    start.store(false, std::sync::atomic::Ordering::Relaxed);
+    resp
 }
 
 #[derive(Debug, Clone)]
 pub struct ServerState {
     pub db: DynoDBPool,
     pub cfg: config::ServerConfig,
-
     pub active: Arc<Mutex<Option<ActiveUser>>>,
-}
-impl ServerState {
-    pub fn new() -> DynoResult<Self> {
-        server_init()
-    }
 
+    pub ws_sender: Sender<WsMessage>,
+}
+
+impl ServerState {
     pub fn change_active_user(&self, user: UserSession) {
         let Ok(mut active_lock) = self.active.lock() else { return; };
         if let Some(active) = active_lock.clone() {
@@ -126,7 +169,7 @@ impl ServerState {
     }
 }
 
-fn server_init() -> DynoResult<ServerState> {
+fn server_init(ws_sender: Sender<WsMessage>) -> DynoResult<ServerState> {
     let cfg = config::ServerConfig::init();
     let manager = DynoDBConnManager::new(&cfg.database_url);
 
@@ -145,6 +188,7 @@ fn server_init() -> DynoResult<ServerState> {
                 db,
                 cfg,
                 active: Default::default(),
+                ws_sender,
             })
         }
         Err(err) => Err(DynoErr::database_error(format!(

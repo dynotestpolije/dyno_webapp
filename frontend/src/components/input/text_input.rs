@@ -3,7 +3,8 @@ use yew::{classes, html, AttrValue, Callback, Classes, Component, Properties, Ta
 
 #[derive(PartialEq, Properties)]
 pub struct TextInputProps {
-    pub value: AttrValue,
+    #[prop_or_default]
+    pub value: Option<AttrValue>,
     #[prop_or_default]
     pub class: Classes,
     #[prop_or(AttrValue::from("text"))]
@@ -12,13 +13,13 @@ pub struct TextInputProps {
     pub types: AttrValue,
     #[prop_or_default]
     pub placeholder: AttrValue,
-
     #[prop_or_default]
     pub border: Classes,
-
     #[prop_or_default]
     pub required: bool,
-
+    #[prop_or(false)]
+    pub disabled: bool,
+    #[prop_or_default]
     pub update_callback: Callback<AttrValue>,
 }
 
@@ -42,6 +43,7 @@ impl Component for TextInput {
             required,
             update_callback,
             border,
+            disabled,
         } = ctx.props();
 
         let onupdatevalue = update_callback.clone();
@@ -69,6 +71,7 @@ impl Component for TextInput {
                 }}
                 class={classes!("input", "input-bordered", "w-full", border.clone())}
                 required={*required}
+                disabled={*disabled}
             />
         </div>
         }

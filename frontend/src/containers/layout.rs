@@ -1,12 +1,12 @@
 use web_sys::{Element, HtmlInputElement};
 use yew::{
     function_component, html, use_callback, use_effect_with_deps, use_node_ref, use_state,
-    Children, Html, Properties, Suspense,
+    Children, Html, Properties,
 };
 use yew_router::prelude::use_route;
 
 use super::{header::Header, sidebar::Sidebar};
-use crate::{containers::suspend::SuspenseContent, route::Route};
+use crate::route::Route;
 
 #[derive(Debug, Clone, PartialEq, Properties)]
 pub struct LayoutProps {
@@ -54,12 +54,10 @@ pub fn layout(props: &LayoutProps) -> Html {
 
         <div class="drawer-content flex flex-col ">
             <Header title={title_value} />
-            <Suspense fallback={html!(<SuspenseContent />)}>
-                <main class="flex-1 overflow-y-auto pt-8 px-6  bg-base-200"  ref={main_ref.clone()}>
-                    {props.children.clone()}
-                    <div class="h-16"></div>
-                </main>
-            </Suspense>
+            <main class="flex-1 overflow-y-auto pt-8 px-6  bg-base-200"  ref={main_ref.clone()}>
+                {props.children.clone()}
+                <div class="h-16"></div>
+            </main>
         </div>
         <Sidebar open_callback={leftsidebar_open_callback} />
       </div>

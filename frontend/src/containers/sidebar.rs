@@ -20,7 +20,7 @@ pub fn sidebar(props: &SideBarProps) -> Html {
 
     let callback = props.open_callback.clone();
     let (state, _) = use_store::<AppState>();
-    let role = state.user().map(|x| x.role).unwrap_or_default();
+    let role = state.user_session().map(|x| x.role).unwrap_or_default();
 
     html! {
         <div class="drawer-side">

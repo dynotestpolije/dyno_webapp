@@ -1,6 +1,8 @@
 use dyno_core::{
-    dynotests::DynoTest, log, users::UserResponse, ActiveResponse, ApiResponse, DynoConfig,
-    DynoErr, DynoResult, HistoryResponse,
+    dynotests::DynoTest,
+    log,
+    users::{UserResponse, UserUpdate},
+    ActiveResponse, ApiResponse, BufferData, DynoConfig, DynoErr, DynoResult, HistoryResponse,
 };
 use gloo::{file::Blob, net::http::Request, utils::document};
 use web_sys::MouseEvent;
@@ -28,7 +30,7 @@ pub async fn fetch_dashboard(state: &mut AppState, token: impl AsRef<str>) {
     state.set_me(fetched);
 }
 pub async fn fetch_dyno(state: &mut AppState, token: impl AsRef<str>) {
-    match Request::get(if state.user().is_some_and(|x| x.role.is_admin()) {
+    match Request::get(if state.user_session().is_some_and(|x| x.role.is_admin()) {
         "/api/dyno?all=true&admin=true"
     } else {
         "/api/dyno?all=true"
@@ -67,7 +69,7 @@ pub async fn fetch_delete_user(token: impl AsRef<str>, user_id: i64) -> bool {
 }
 
 pub async fn fetch_user(state: &mut AppState, token: impl AsRef<str>) {
-    let url = if state.user().is_some_and(|x| x.role.is_admin()) {
+    let url = if state.user_session().is_some_and(|x| x.role.is_admin()) {
         "/api/users"
     } else {
         return;
@@ -92,7 +94,7 @@ pub async fn fetch_user(state: &mut AppState, token: impl AsRef<str>) {
 }
 
 pub async fn fetch_infos(state: &mut AppState, token: impl AsRef<str>) {
-    let url = if state.user().is_some_and(|x| x.role.is_admin()) {
+    let url = if state.user_session().is_some_and(|x| x.role.is_admin()) {
         "/api/info?all=true&admin=true"
     } else {
         return;
@@ -116,9 +118,29 @@ pub async fn fetch_infos(state: &mut AppState, token: impl AsRef<str>) {
     }
 }
 
+pub async fn fetch_info_byid(token: impl AsRef<str>, id: i64) -> Option<DynoConfig> {
+    let url = format!("/api/info?id={}", id);
+    match Request::get(&url)
+        .header("Authorization", token.as_ref())
+        .send()
+        .await
+    {
+        Ok(resp) if resp.ok() => resp
+            .json::<ApiResponse<DynoConfig>>()
+            .await
+            .map(|x| x.payload)
+            .ok(),
+        Err(err) => {
+            log::error!("{err}");
+            None
+        }
+        _ => None,
+    }
+}
+
 pub async fn fetch_histories(state: &mut AppState, token: impl AsRef<str>) {
-    let url = if state.user().is_some_and(|x| x.role.is_admin()) {
-        "/api/history"
+    let url = if state.user_session().is_some_and(|x| x.role.is_admin()) {
+        "/api/history?all=true&admin=true"
     } else {
         return;
     };
@@ -161,8 +183,39 @@ pub async fn fetch_status(active: &UseStateSetter<Option<ActiveResponse>>, token
     active.set(fetched_active)
 }
 
-pub async fn fetch_and_save(file_url: impl AsRef<str>, token: impl AsRef<str>) -> DynoResult<()> {
+pub async fn fetch_data_dyno(file_url: impl AsRef<str>, token: impl AsRef<str>) -> BufferData {
+    match Request::get(file_url.as_ref())
+        .query([("tp", "json")])
+        .header("Authorization", token.as_ref())
+        .send()
+        .await
+        .map_err(DynoErr::api_error)
+    {
+        Ok(response) => match response
+            .json::<ApiResponse<BufferData>>()
+            .await
+            .map_err(DynoErr::api_error)
+        {
+            Ok(json) => json.payload,
+            Err(err) => {
+                log::error!("{err}");
+                Default::default()
+            }
+        },
+        Err(err) => {
+            log::error!("{err}");
+            Default::default()
+        }
+    }
+}
+
+pub async fn fetch_and_save(
+    file_url: impl AsRef<str>,
+    filetype: impl AsRef<str>,
+    token: impl AsRef<str>,
+) -> DynoResult<()> {
     let response = Request::get(file_url.as_ref())
+        .query([("tp", filetype.as_ref())])
         .header("Authorization", token.as_ref())
         .send()
         .await
@@ -177,7 +230,6 @@ pub async fn fetch_and_save(file_url: impl AsRef<str>, token: impl AsRef<str>) -
         .last()
         .map(|name| name.trim_matches(|c| c == '"' || c == ' '))
         .ok_or(DynoErr::api_error("Failed get last string split"))?;
-    log::info!("filename: {}", filename);
 
     response
         .binary()
@@ -215,4 +267,22 @@ pub async fn fetch_and_save(file_url: impl AsRef<str>, token: impl AsRef<str>) -
 
             web_sys::Url::revoke_object_url(&url).expect("Failed to revoce object url");
         })
+}
+
+pub async fn update_user(id: i64, user: UserUpdate, token: impl AsRef<str>) -> DynoResult<i64> {
+    let url = format!("/users/{id}");
+    let resp = Request::get(&url)
+        .header("Authorization", token.as_ref())
+        .json(&user)
+        .map_err(DynoErr::api_error)?
+        .send()
+        .await
+        .map_err(DynoErr::api_error)?;
+
+    if resp.ok() {
+        resp.json::<i64>().await.map_err(DynoErr::api_error)
+    } else {
+        let err = resp.text().await.map_err(DynoErr::api_error)?;
+        Err(DynoErr::api_error(err))
+    }
 }

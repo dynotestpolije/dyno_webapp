@@ -41,9 +41,6 @@ diesel::table! {
     histories (id) {
         id -> BigInt,
         user_id -> BigInt,
-        user_uuid -> Text,
-        dyno_id -> BigInt,
-        long_usage -> BigInt,
         created_at -> Timestamp,
     }
 }
@@ -63,4 +60,9 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(dyno_info, dynos, histories, users,);
+diesel::allow_tables_to_appear_in_same_query!(
+    dyno_info,
+    dynos,
+    histories,
+    users,
+);

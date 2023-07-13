@@ -1,6 +1,5 @@
 use std::path::Path as StdPath;
 
-use actix_multipart::Multipart;
 use actix_web::{
     get,
     http::header,
@@ -8,6 +7,8 @@ use actix_web::{
     web::{self, Path},
     HttpResponse,
 };
+
+use actix_multipart::Multipart;
 use dyno_core::{
     crypto::{checksum_from_bytes, compare_checksums},
     dynotests::DynoTestDataInfo,
@@ -15,7 +16,6 @@ use dyno_core::{
     ApiResponse, BufferData, CompresedSaver, CsvSaver, DynoErr, DynoResult, ExcelSaver,
 };
 use futures::TryStreamExt;
-// use futures::TryStreamExt;
 
 use crate::{
     actions::dyno as dyno_actions,
@@ -96,17 +96,17 @@ pub async fn add_dyno(
     let uuid = session.uuid;
     let public_path = cfg.app_public_path.clone();
     let blk_result = web::block(move || {
-        let mut conn = dbpool.get().map_err(DynoErr::database_error)?;
+        let mut conn = dbpool
+            .get()
+            .map_err(|_| DynoErr::database_error("Failed to get database connection"))?;
         let dyno_config = DynoTestDataInfo::decompress(&info_stream).map_err(|err| {
-            DynoErr::bad_request_error(format!(
-                "Multipart POST data is invalid, there no info config - {err}",
-            ))
+            DynoErr::bad_request_error(format!("Multipart POST 'info' part is invalid - {err}",))
         })?;
 
         let checksum = checksum_from_bytes(&data_stream);
         if !compare_checksums(checksum.as_bytes(), dyno_config.checksum_hex.as_bytes()) {
             return Err(DynoErr::expectation_failed_error(
-                "Failed receive data, checksum of data stream is not the same",
+                "Failed receive data, checksum of 'data' part stream is not the same",
             ));
         }
 
@@ -154,7 +154,6 @@ pub async fn add_dyno(
 pub async fn get_dyno(
     web::Query(DynoUrlsQueries {
         id,
-        user_id,
         max,
         all,
         admin,
@@ -163,27 +162,26 @@ pub async fn get_dyno(
     data: web::Data<crate::ServerState>,
 ) -> DynoResult<HttpResponse> {
     let dbpool = data.db.clone();
-    let admin = if admin.is_some_and(|x| x) {
-        if session.role.is_admin() {
-            true
-        } else {
-            return Err(DynoErr::unauthorized_error("Admin Access is Required"));
-        }
-    } else {
-        false
-    };
 
-    let user_id = user_id.unwrap_or(session.id);
+    let is_admin = session.role.is_admin();
+    let admin_query = admin.is_some_and(|x| x);
+    if admin_query && !is_admin {
+        return Err(DynoErr::unauthorized_error(
+            "NotAuthorized! Admin Access required!",
+        ));
+    }
+
+    let user_id = session.id;
     let blk_result = web::block(move || {
         dbpool
             .get()
             .map_err(DynoErr::database_error)
             .and_then(|mut conn| match id {
-                Some(id) => dyno_actions::select(&mut conn, id, user_id)
+                Some(id) => dyno_actions::select_by_id(&mut conn, id)
                     .map(|x| OneOrMany::One(Dynos::into_response(x))),
                 None => {
-                    if all.is_some_and(|x| x) || max.is_none() {
-                        if admin {
+                    if all.is_some_and(|x| x) {
+                        if admin_query && is_admin {
                             dyno_actions::select_all(&mut conn)
                         } else {
                             dyno_actions::select_many(&mut conn, user_id)
@@ -214,8 +212,32 @@ pub async fn get_dyno(
     })
 }
 
+use dyno_core::serde;
+#[repr(u8)]
+#[derive(Clone, Copy, Default, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+#[serde(crate = "serde")]
+pub enum FileType {
+    #[serde(rename = "json")]
+    Json,
+    #[serde(rename = "bin")]
+    #[default]
+    Bin,
+    #[serde(rename = "csv")]
+    Csv,
+    #[serde(rename = "excel")]
+    Excel,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, serde::Serialize, PartialEq)]
+#[serde(crate = "serde")]
+pub struct QueryFile {
+    #[serde(default)]
+    pub tp: FileType,
+}
+
 #[get("/dyno/{user_uuid}/{file}")]
-pub async fn get_file_bin(
+pub async fn get_file(
+    web::Query(QueryFile { tp }): web::Query<QueryFile>,
     path: Path<(String, String)>,
     JwtUserMiddleware(_session): JwtUserMiddleware,
     data: web::Data<crate::ServerState>,
@@ -228,82 +250,46 @@ pub async fn get_file_bin(
         .join(user_uuid)
         .join(&file);
 
-    let result_block =
-        web::block(move || std::fs::read(dyno_path).map_err(DynoErr::internal_server_error))
-            .await
-            .map_err(DynoErr::internal_server_error)??;
-
-    Ok(HttpResponse::Ok()
-        .append_header(header::ContentDisposition::attachment(file))
-        .content_type("application/octet-stream")
-        .body(result_block))
-}
-
-#[get("/dyno/{user_uuid}/{file}/xlsx")]
-pub async fn get_file_excel(
-    path: Path<(String, String)>,
-    JwtUserMiddleware(_session): JwtUserMiddleware,
-    data: web::Data<crate::ServerState>,
-) -> DynoResult<HttpResponse> {
-    let (user_uuid, file) = path.into_inner();
-    let dyno_path = data
-        .cfg
-        .app_public_path
-        .join("dyno")
-        .join(user_uuid)
-        .join(&file);
-
-    let _filename_excel = dyno_path
-        .with_extension("xlsx")
-        .file_name()
-        .map_or(String::from("dyno.xlsx"), |x| {
-            x.to_string_lossy().to_string()
-        });
-
-    let result_block = web::block(move || {
-        BufferData::decompress_from_path(dyno_path).and_then(|buffer| {
-            let mut writer = Vec::with_capacity(std::mem::size_of::<BufferData>());
-            buffer.save_excel_from_writer(&mut writer).map(|_| writer)
-        })
+    web::block(move || {
+        std::fs::read(dyno_path)
+            .map_err(DynoErr::internal_server_error)
+            .and_then(|bytes| match tp {
+                FileType::Bin => Ok(bytes),
+                FileType::Csv => {
+                    BufferData::decompress(bytes).and_then(|x| x.save_csv_into_bytes())
+                }
+                FileType::Excel => {
+                    BufferData::decompress(bytes).and_then(|x| x.save_excel_into_bytes())
+                }
+                FileType::Json => BufferData::decompress(bytes).and_then(|x| {
+                    dyno_core::serde_json::to_vec(&ApiResponse::success(x))
+                        .map_err(DynoErr::serialize_error)
+                }),
+            })
     })
     .await
-    .map_err(DynoErr::internal_server_error)??;
-
-    Ok(HttpResponse::Ok()
-        .append_header(header::ContentDisposition::attachment(format!(
-            "{}.xlsx",
-            file
-        )))
-        .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        .body(result_block))
-}
-
-#[get("/dyno/{user_uuid}/{file}/csv")]
-pub async fn get_file_csv(
-    path: Path<(String, String)>,
-    JwtUserMiddleware(_): JwtUserMiddleware,
-    data: web::Data<crate::ServerState>,
-) -> DynoResult<HttpResponse> {
-    let (user_uuid, file) = path.into_inner();
-    let dyno_path = data
-        .cfg
-        .app_public_path
-        .join("dyno")
-        .join(user_uuid)
-        .join(&file);
-
-    let result_block = web::block(move || {
-        BufferData::decompress_from_path(dyno_path).and_then(|buffer| buffer.save_csv_into_bytes())
-    })
-    .await
-    .map_err(DynoErr::internal_server_error)?;
-    result_block.map(|result| {
-        HttpResponse::Ok()
+    .map_err(DynoErr::internal_server_error)?
+    .map(|data| match tp {
+        FileType::Bin => HttpResponse::Ok()
+            .append_header(header::ContentDisposition::attachment(file))
+            .content_type("application/octet-stream")
+            .body(data),
+        FileType::Csv => HttpResponse::Ok()
             .append_header(header::ContentDisposition::attachment(format!(
                 "{}.csv",
                 file
             )))
             .content_type("text/csv")
-            .body(result)
+            .body(data),
+        FileType::Excel => HttpResponse::Ok()
+            .append_header(header::ContentDisposition::attachment(format!(
+                "{}.xlsx",
+                file
+            )))
+            .content_type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .body(data),
+        FileType::Json => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(data),
     })
 }

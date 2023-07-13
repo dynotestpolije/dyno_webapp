@@ -1,6 +1,6 @@
 use dyno_core::chrono::{Local, TimeZone};
-use web_sys::MouseEvent;
-use yew::{function_component, html, platform::spawn_local, use_state, Callback, Html};
+
+use yew::{function_component, html, use_state, Html};
 use yew_icons::{Icon, IconId};
 use yewdux::prelude::use_store;
 
@@ -11,16 +11,10 @@ pub fn page_admin_dynos() -> Html {
     let idx_open = use_state(|| Option::<usize>::None);
     let (state, dispatch) = use_store::<AppState>();
     let on_refresh = dispatch.reduce_mut_future_callback_with(move |s, _| {
-        let token = format!("Bearer {}", s.token().unwrap());
+        let token = format!("Bearer {}", s.token_session().unwrap());
         Box::pin(async move { crate::fetch::fetch_dyno(s, token).await })
     });
-    let token = format!("Bearer {}", state.token().unwrap());
-    let ondownload = {
-        Callback::from(move |url: String| {
-            let token = token.clone();
-            spawn_local(async move { crate::fetch::fetch_and_save(url, token).await.unwrap() })
-        })
-    };
+    let _token = format!("Bearer {}", state.token_session().unwrap());
     let table_body = {
         state
             .get_data()
@@ -36,10 +30,8 @@ pub fn page_admin_dynos() -> Html {
                         <td>
                             if d.verified {
                                 <Icon icon_id={IconId::HeroiconsOutlineCheck} />
-                                {"Verified"}
                             } else {
                                 <Icon icon_id={IconId::HeroiconsOutlineXMark} />
-                                {"Verified"}
                             }
                         </td>
                         <td>{(d.stop - d.start).num_minutes()}</td>
@@ -53,12 +45,6 @@ pub fn page_admin_dynos() -> Html {
                                 cb.set(Some(k))
                             }}>
                                 {"Detail"}
-                            </button>
-                            <button class="btn" onclick={let cb = ondownload.clone(); move |e: MouseEvent| {
-                                e.prevent_default();
-                                cb.emit(d.data_url.clone())
-                            }}>
-                                {"Download"}
                             </button>
                         </td>
                     </tr>

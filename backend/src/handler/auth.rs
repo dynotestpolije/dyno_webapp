@@ -1,3 +1,4 @@
+use crate::actions;
 use crate::middlewares::JwtUserMiddleware;
 use crate::{actions::user as user_actions, models::user::NewUser};
 use actix_web::cookie::{self, Cookie};
@@ -22,7 +23,7 @@ pub async fn register_user(
     let ret_block = web::block(move || {
         data.db
             .get()
-            .map_err(DynoErr::database_error)
+            .map_err(|_| DynoErr::database_error("Failed to get database connection"))
             .and_then(|mut conn| {
                 if matches!(
                     user_actions::is_exists_by_nim(&mut conn, &user_registration.nim),
@@ -57,15 +58,20 @@ pub async fn login_user(
 
     let nim_borrowed = nim.clone();
     let db = data.db.clone();
-    let user = web::block(move || match db.get().map_err(DynoErr::database_error) {
-        Ok(mut conn) => match user_actions::find_by_nim(&mut conn, &nim_borrowed) {
-            Ok(user) if verify_hash_password(&user.password, password) => Ok(user),
-            Ok(_) => Err(DynoErr::unauthorized_error(
-                "Auth Failed! User Password is not the same",
-            )),
+    let user = web::block(move || {
+        match db
+            .get()
+            .map_err(|_| DynoErr::database_error("Failed to get database connection"))
+        {
+            Ok(mut conn) => match user_actions::find_by_nim(&mut conn, &nim_borrowed) {
+                Ok(user) if verify_hash_password(&user.password, password) => Ok(user),
+                Ok(_) => Err(DynoErr::unauthorized_error(
+                    "Auth Failed! User Password is not the same",
+                )),
+                Err(err) => Err(err),
+            },
             Err(err) => Err(err),
-        },
-        Err(err) => Err(err),
+        }
     })
     .await
     .map_err(DynoErr::internal_server_error)??;
@@ -82,24 +88,10 @@ pub async fn login_user(
         data.cfg.jwt.access_token_private_key.as_bytes(),
     )?;
 
-    let refresh_token_details = TokenDetails::generate(
-        user_session,
-        data.cfg.jwt.refresh_token_max_age,
-        data.cfg.jwt.refresh_token_private_key.as_bytes(),
-    )?;
-
     let access_cookie = Cookie::build("access_token", access_token_details.token.clone().unwrap())
         .path("/")
         .max_age(cookie::time::Duration::minutes(
             data.cfg.jwt.access_token_max_age,
-        ))
-        .http_only(true)
-        .finish();
-
-    let refresh_cookie = Cookie::build("refresh_token", refresh_token_details.token.unwrap())
-        .path("/")
-        .max_age(cookie::time::Duration::minutes(
-            data.cfg.jwt.refresh_token_max_age,
         ))
         .http_only(true)
         .finish();
@@ -119,7 +111,6 @@ pub async fn login_user(
     dyno_core::DynoResult::Ok(
         HttpResponse::Ok()
             .cookie(access_cookie)
-            .cookie(refresh_cookie)
             .cookie(logged_in_cookie)
             .json(ApiResponse::success(access_token_details)),
     )
@@ -130,33 +121,41 @@ pub async fn logout_user(
     JwtUserMiddleware(_d): JwtUserMiddleware,
     data: web::Data<crate::ServerState>,
     req: HttpRequest,
-) -> HttpResponse {
+) -> DynoResult<HttpResponse> {
     let access_cookie = Cookie::build("access_token", "")
         .path("/")
         .max_age(RESET_AGE_DUR)
         .http_only(true)
         .finish();
-    let refresh_cookie = Cookie::build("refresh_token", "")
-        .path("/")
-        .max_age(RESET_AGE_DUR)
-        .http_only(true)
-        .finish();
-    let logged_in_cookie = Cookie::build("logged_in", "")
+    let logged_in_cookie = Cookie::build("logged_in", "false")
         .path("/")
         .max_age(RESET_AGE_DUR)
         .http_only(true)
         .finish();
 
-    if let Some(head) = req.headers().get(header::USER_AGENT) {
-        if head.to_str().is_ok_and(|x| x.contains("Dyno/Desktop")) {
-            data.set_active(None);
+    if let Some(active) = data.get_active() {
+        if let Some(head) = req.headers().get(header::USER_AGENT) {
+            if head.to_str().is_ok_and(|x| x.contains("Dyno/Desktop")) {
+                if let Some(hist) = active.to_history() {
+                    let db = data.db.clone();
+                    web::block(move || {
+                        db.get()
+                            .map_err(|_| {
+                                DynoErr::database_error("Failed to get database connection")
+                            })
+                            .and_then(|mut conn| actions::history::insert(&mut conn, hist))
+                    })
+                    .await
+                    .map_err(DynoErr::internal_server_error)??;
+                }
+                data.set_active(None);
+            }
         }
     }
-    HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .cookie(access_cookie)
-        .cookie(refresh_cookie)
         .cookie(logged_in_cookie)
-        .json(ApiResponse::<String>::success("Logout Success".to_owned()))
+        .json(ApiResponse::<String>::success("Logout Success".to_owned())))
 }
 
 #[get("/auth/me")]
@@ -167,7 +166,7 @@ pub async fn me(
     let user_response = web::block(move || {
         data.db
             .get()
-            .map_err(DynoErr::database_error)
+            .map_err(|_| DynoErr::database_error("Failed to get database connection"))
             .and_then(|mut conn| user_actions::find_by_id(&mut conn, user_session.id))
     })
     .await
